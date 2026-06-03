@@ -1,38 +1,37 @@
 # Roadmap
 
-This is a directional roadmap, not a commitment. Priorities may shift based on user feedback.
+This is a directional roadmap for **TythanAI Community Edition**, not a commitment.
+Priorities may shift based on user feedback.
 
-## Now (current release)
+## Now (Community Edition)
 
-- SAST via Semgrep + custom rule engine (3 462 rules, Python/JS/Go/Java/Rust/Swift/Solidity/FunC)
-- SCA via OSV.dev + EPSS enrichment
-- Secrets detection (git history + live scan)
+- SAST via Semgrep + a curated rule set (Python / JS / TS / Java / Go / Rust / PHP / Ruby)
+- SCA via OSV.dev + EPSS enrichment, with an offline fallback
+- Secrets detection in source
 - IaC scanner (Terraform, CloudFormation, Kubernetes)
-- Container scanner (Dockerfile, docker-compose)
-- Web3 auditors: TON FunC/Tolk, Solidity, Solana/Anchor, CosmWasm
-- Multi-language CPG (taint analysis) for Python, JavaScript, Go, Java, Rust
-- AutoPR: auto-generated fix pull requests
-- DAST (passive, requires ZAP)
-- SBOM generation (SPDX 2.3, CycloneDX 1.4)
+- Web3 auditing — core checks for TON FunC/Tolk, Solidity, Solana/Anchor, CosmWasm
 - GitHub Actions integration
-- SARIF 2.1.0 output
-- SaaS onboarding, webhooks, usage dashboard
+- SARIF 2.1.0, JSON and HTML reports
 
 ## Next (within 3 months)
 
-- PyPI package + Docker image published
-- VS Code extension published to marketplace
-- Honest public benchmark on full Juliet 1.3 corpus (multi-language)
-- GitHub App (install once, auto-scans all repos)
-- Slack and Jira integrations
-- Self-hosted Helm chart
+- Expanded Community Web3 rule coverage
+- Docker image published
+- Honest public benchmark on the Juliet corpus
+- More example CI integrations
 
-## Later
+## Pro / Enterprise
 
-- Kotlin, Scala, Move, Rust WASM contract auditors
-- IDE plugin for JetBrains
-- SOC 2 Type II audit
-- Managed cloud scanning (no local install required)
+Advanced capabilities are available in the commercial editions (for teams and audit firms):
+
+- Full rule library (3,400+) and deep Web3 analysis (symbolic execution, formal checks)
+- Full CPG taint analysis (Go / Java / Rust)
+- AutoPR auto-generated fix pull requests, AI-powered fix suggestions
+- DAST, SBOM compliance (SPDX / CycloneDX)
+- SaaS dashboard, webhooks, multi-agent orchestration, GitHub App
+- Priority support & SLA
+
+See the comparison table in the [README](README.md#community-vs-pro--enterprise).
 
 ## Not planned
 

@@ -1,6 +1,6 @@
-# TythanAI
+# TythanAI — Community Edition
 
-**The first open-source security scanner that audits TON, Solana and CosmWasm smart contracts natively — alongside classic SAST, SCA, secrets and IaC. One CLI. No account. No telemetry.**
+**Open-source security scanner with native Web3 auditing for TON, Solana, CosmWasm and Solidity — alongside SAST, SCA, secrets and IaC. One CLI. No account. No telemetry.**
 
 [![PyPI](https://img.shields.io/pypi/v/tythanai-community?color=brightgreen)](https://pypi.org/project/tythanai-community/)
 [![License: BSL 1.1](https://img.shields.io/badge/License-BSL%201.1-orange.svg)](LICENSE)
@@ -20,7 +20,7 @@ That's it. No sign-up, no API key, no data leaves your machine.
 
 ## See it in action
 
-Point it at a folder and it tells you what's actually exploitable:
+Point it at a folder and it tells you what's actually exploitable *(example output)*:
 
 ```
   ______      __  __               ___    ____
@@ -47,23 +47,25 @@ Point it at a folder and it tells you what's actually exploitable:
         SOL005  [solidity_scanner]
 
   SCAN SUMMARY
-  Risk      : CRITICAL (100/100)
+  Risk      : CRITICAL (95/100)
   Findings  : 5    (CRITICAL 3 · HIGH 2)
 ```
 
 ---
 
-## Why TythanAI
+## What's included in Community Edition
 
-Most scanners do SAST or dependencies. Almost none understand **Web3** — and the ones that do are single-chain and closed-source. TythanAI is the only free tool that covers the whole picture:
+Everything below runs locally, free, with no account:
 
-- 🪙 **Web3-native** — TON FunC/Tolk, Solidity/EVM, Solana/Anchor and CosmWasm auditors built in (reentrancy, signer checks, replay, oracle manipulation, PDA validation…)
-- 🔍 **SAST** — taint analysis across 12 languages with a curated rule library
-- 📦 **SCA** — dependency CVEs via OSV.dev with EPSS exploit-probability ranking
-- 🔑 **Secrets** — API keys, tokens and private keys in source *and* git history
+- 🪙 **Web3 auditing** — core security checks for **TON FunC/Tolk**, **Solidity/EVM**, **Solana/Anchor** and **CosmWasm** (reentrancy, signer checks, replay, unchecked calls, access control…)
+- 🔍 **SAST** — Semgrep + a curated rule set across common languages (Python, JS/TS, Java, Go, Rust, PHP, Ruby)
+- 📦 **SCA** — dependency CVEs via OSV.dev with EPSS exploit-probability ranking, plus an offline fallback
+- 🔑 **Secrets** — API keys, tokens and private keys detected in your source
 - ☁️ **IaC** — Terraform, Kubernetes and CloudFormation misconfigurations
-- 📄 **Standards-friendly** — SARIF 2.1.0 (GitHub Code Scanning), JSON, HTML and SBOM output
-- 🔒 **Private by design** — runs fully local, no account, no telemetry
+- 📄 **Reports** — SARIF 2.1.0 (GitHub Code Scanning), JSON and HTML
+- 🔒 **Private by design** — fully local, no account, no telemetry
+
+> Community Edition is a fast, practical scanner that catches the most common, highest-impact issues. Deeper analysis (full rule library, symbolic/formal Web3 analysis, auto-fix PRs, CI integrations) lives in **Pro / Enterprise** — see the table below.
 
 ---
 
@@ -78,8 +80,8 @@ tythanai scan ./myproject --no-sast --no-sca   # e.g. secrets + IaC + web3 only
 
 # Machine-readable output
 tythanai scan ./myproject --sarif results.sarif   # upload to GitHub Code Scanning
-tythanai scan ./myproject --json   report.json
-tythanai scan ./myproject --html   report.html
+tythanai scan ./myproject --json  report.json
+tythanai scan ./myproject --html  report.html
 
 # Quiet mode (findings + summary only, no banner)
 tythanai scan ./myproject --quiet
@@ -106,23 +108,33 @@ jobs:
 
 ---
 
-## Supported languages & coverage
+## Community vs Pro / Enterprise
 
-| Area | Coverage |
-|------|----------|
-| **TON** | FunC / Tolk — reentrancy, replay, weak randomness, bounce handling |
-| **Solana** | Anchor — signer checks, CPI validation, PDA correctness |
-| **CosmWasm** | admin checks, reply-ID handling, submessage ordering |
-| **Solidity / EVM** | reentrancy, oracle manipulation, access control, DeFi patterns |
-| **SAST** | Python, JS/TS, Java, Go, Rust, PHP, Ruby |
-| **Secrets** | all languages, including git history |
-| **IaC** | Terraform, Kubernetes, CloudFormation, CI/CD configs |
+Community Edition is genuinely useful on its own. Teams shipping production smart contracts — and audit firms — upgrade for depth, automation and support.
+
+| Capability | Community (free) | Pro / Enterprise |
+|---|:--:|:--:|
+| TON / Solidity / Solana / CosmWasm auditing | Core checks | **Full rule set + deep analysis** |
+| Web3 symbolic execution & formal checks | — | ✓ |
+| SAST rule library | up to 500 rules | **3,400+ rules** |
+| Full CPG taint analysis (Go / Java / Rust) | — | ✓ |
+| SCA (OSV.dev + EPSS) | ✓ | ✓ |
+| Secrets & IaC | ✓ | ✓ |
+| AutoPR — auto-generated fix pull requests | — | ✓ |
+| AI-powered fix suggestions | — | ✓ |
+| DAST (active web scanning) | — | ✓ |
+| SBOM compliance (SPDX / CycloneDX) | — | ✓ |
+| SaaS dashboard, webhooks, multi-agent orchestration | — | ✓ |
+| Priority support & SLA | — | ✓ |
+| Reports | SARIF · JSON · HTML | + SBOM · compliance |
+
+**Need Pro or Enterprise?** TythanAI Pro is built for teams and audit firms running TON / Solana / Solidity engagements. To request access or a demo, [open an issue](https://github.com/TythanAI/TythanAI/issues/new) or visit [tythanai.io](https://tythanai.io).
 
 ---
 
-## How it compares
+## How Community Edition compares
 
-| | TythanAI | Semgrep OSS | Slither | Snyk |
+| | TythanAI CE | Semgrep OSS | Slither | Snyk |
 |---|:--:|:--:|:--:|:--:|
 | SAST | ✓ | ✓ | ✗ | partial |
 | SCA (OSV.dev) | ✓ | ✗ | ✗ | ✓ |
@@ -131,7 +143,7 @@ jobs:
 | **TON FunC / Tolk** | ✓ | ✗ | ✗ | ✗ |
 | **Solana / Anchor** | ✓ | ✗ | ✗ | ✗ |
 | **CosmWasm** | ✓ | ✗ | ✗ | ✗ |
-| SARIF + SBOM | ✓ | partial | ✗ | partial |
+| SARIF output | ✓ | partial | ✗ | partial |
 | No account required | ✓ | ✓ | ✓ | ✗ |
 
 ---

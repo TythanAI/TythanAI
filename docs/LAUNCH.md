@@ -25,8 +25,8 @@ single-chain and closed-source.
 
 TythanAI runs fully local (no account, no telemetry) and combines:
 - Native Web3 auditing for TON FunC/Tolk, Solana/Anchor, CosmWasm and Solidity
-- Classic SAST across 12 languages, dependency CVEs (OSV.dev + EPSS), secrets, IaC
-- SARIF/JSON/HTML/SBOM output, so it drops straight into CI
+- Classic SAST (Semgrep + curated rules), dependency CVEs (OSV.dev + EPSS), secrets, IaC
+- SARIF/JSON/HTML output, so it drops straight into CI
 
   pip install tythanai-community
   tythanai scan ./your-project
@@ -58,8 +58,8 @@ built one CLI that does all of it locally — no account, no telemetry.
   tythanai scan ./project
 
 It found reentrancy + a leaked AWS key in my test repo in one pass. Web3 coverage:
-TON FunC/Tolk, Solana/Anchor, CosmWasm, Solidity. Plus SAST (12 languages), SCA via
-OSV.dev, secrets (incl. git history) and IaC.
+TON FunC/Tolk, Solana/Anchor, CosmWasm, Solidity. Plus SAST (Semgrep + curated
+rules), SCA via OSV.dev, secrets and IaC.
 
 Source-available (BSL 1.1): https://github.com/TythanAI/TythanAI
 Would love feedback on rule coverage and FP rate.
