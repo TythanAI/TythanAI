@@ -1,0 +1,97 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tythanai-community"
+version = "1.0.1"
+description = "Open-source security scanner — SAST, SCA, Secrets, IaC, TON/Solana/CosmWasm/Solidity"
+readme = "README.md"
+license = {text = "BSL-1.1"}
+authors = [{name = "TythanAI Team", email = "security@tythanai.io"}]
+keywords = ["security", "sast", "sca", "semgrep", "vulnerability", "sarif", "devsecops", "appsec", "web3", "ton", "solana", "solidity"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "Topic :: Security",
+    "Topic :: Software Development :: Quality Assurance",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: Other/Proprietary License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.0.0",
+    "PyYAML>=6.0.1",
+    "requests>=2.31.0",
+    "httpx>=0.27.0",
+    "semgrep>=1.100.0",
+    "bandit>=1.7.7",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+api = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.9",
+]
+memory = ["chromadb>=0.4.24"]
+ai = ["openai>=1.30.0"]
+full = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.27.0",
+    "python-multipart>=0.0.9",
+    "chromadb>=0.4.24",
+    "openai>=1.30.0",
+    "rich>=13.0.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "ruff>=0.4.0",
+    "mypy>=1.10.0",
+]
+
+[project.scripts]
+tythanai = "tythanai_community_cli:main"
+tythanai-community = "tythanai_community_cli:main"
+
+[project.urls]
+Homepage = "https://tythanai.io"
+Documentation = "https://github.com/TythanAI/TythanAI#readme"
+Repository = "https://github.com/TythanAI/TythanAI"
+"Bug Tracker" = "https://github.com/TythanAI/TythanAI/issues"
+Changelog = "https://github.com/TythanAI/TythanAI/releases"
+
+[tool.setuptools]
+license-files = []
+py-modules = ["tythanai_community_cli"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests*", "docs*", "landing*"]
+
+[tool.setuptools.package-data]
+"*" = ["rules/**/*.yaml", "rules/**/*.yml", "rules/**/*.json"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501", "F401"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]

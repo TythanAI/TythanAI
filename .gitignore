@@ -1,0 +1,39 @@
+# Byte-compiled / optimized / cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Release archives (never commit build artifacts)
+*.tar.gz
+*.tgz
+*.zip
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Local data / reports / secrets
+*.db
+ghost_reports/
+*.local
+.env
+.env.*

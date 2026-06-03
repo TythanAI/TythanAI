@@ -1,0 +1,25 @@
+TythanAI Security Platform
+Copyright (c) 2026 TythanAI Labs
+
+This product is licensed under the Business Source License 1.1 (see LICENSE).
+On the Change Date (2029-06-01) it converts to the Apache License, Version 2.0.
+
+This product bundles or depends on third-party open-source components, each
+under its own license. Notable dependencies and their licenses:
+
+  - Semgrep            LGPL-2.1 / commercial   (optional, invoked as a tool)
+  - Pydantic           MIT
+  - PyYAML             MIT
+  - requests           Apache-2.0
+  - httpx              BSD-3-Clause
+  - FastAPI            MIT                      (optional, API server)
+  - uvicorn            BSD-3-Clause             (optional)
+  - ChromaDB           Apache-2.0               (optional, rules marketplace)
+  - bandit             Apache-2.0
+
+Vulnerability data is retrieved at runtime from public services (OSV.dev,
+FIRST EPSS, CISA KEV) under their respective terms of use. TythanAI does not
+redistribute their datasets.
+
+Trademarks (TON, Solana, CosmWasm, Semgrep, Snyk, SonarQube, GitHub) are the
+property of their respective owners and are used for identification only.
