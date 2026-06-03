@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tythanai-community"
-version = "1.0.2"
+version = "1.0.3"
 description = "Open-source security scanner — SAST, SCA, Secrets, IaC, TON/Solana/CosmWasm/Solidity"
 readme = "README.md"
 license = {text = "BSL-1.1"}
