@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body {
+    background: #0f0f0f;
+    color: #e0e0e0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+}
+
+@layer utilities {
+  .knob-track { stroke: #333; stroke-width: 3; fill: none; }
+  .knob-fill  { stroke-width: 3; fill: none; stroke-linecap: round; }
+  .step-btn { transition: background 0.05s, transform 0.05s; }
+  .step-btn:active { transform: scale(0.92); }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "beatforge",
+  "version": "1.0.0",
+  "description": "BEATFORGE — Hip-Hop DAW, beat production studio",
+  "main": "electron.main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "vite build && electron-builder",
+    "generate-samples": "node scripts/generate-samples.js"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.0.0",
+    "autoprefixer": "^10.4.14",
+    "concurrently": "^8.0.1",
+    "electron": "^25.0.0",
+    "electron-builder": "^24.0.0",
+    "postcss": "^8.4.24",
+    "tailwindcss": "^3.3.2",
+    "vite": "^4.3.9",
+    "wait-on": "^7.0.1"
+  },
+  "build": {
+    "appId": "com.beatforge.app",
+    "productName": "BEATFORGE",
+    "directories": { "output": "dist-electron" },
+    "files": ["dist/**/*", "electron.main.js"],
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg" }
+  }
+}
