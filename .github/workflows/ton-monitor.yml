@@ -1,0 +1,61 @@
+name: TON upstream monitor
+
+# Polls every in-scope TON bug-bounty repo for new commits, scans the diff with
+# the TythanAI community scanner, and alerts via Telegram. State is committed
+# back so it never re-alerts or misses a gap.
+#
+# NOTE: GitHub only fires `schedule:` for workflow files that live on the
+# repository's DEFAULT branch. While this lives on a feature branch you can run
+# it manually via the "Run workflow" button (workflow_dispatch). Merge it to the
+# default branch to activate the every-30-minutes cron.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write          # commit the updated state file back
+
+concurrency:
+  group: ton-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install scanner dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run TON monitor
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python monitor/ton_monitor.py
+
+      - name: Persist state
+        if: always()
+        run: |
+          if [[ -n "$(git status --porcelain monitor/state.json)" ]]; then
+            git config user.name  "ton-monitor[bot]"
+            git config user.email "ton-monitor@users.noreply.github.com"
+            git add monitor/state.json
+            git commit -m "ton-monitor: update last-seen commits [skip ci]"
+            for i in 1 2 3 4; do
+              git push && break || sleep $((2**i))
+            done
+          else
+            echo "state unchanged"
+          fi
