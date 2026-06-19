@@ -283,6 +283,16 @@ def save_state(state: dict) -> None:
 def main() -> int:
     if not GH_TOKEN:
         print("WARNING: no GITHUB_TOKEN; API rate limits will be tight.", file=sys.stderr)
+
+    # Manual wiring check: `workflow_dispatch` with test_telegram=true sends a ping
+    # immediately, regardless of baseline state, so you can confirm Telegram works
+    # without waiting for a real upstream commit.
+    if os.environ.get("TEST_TELEGRAM", "").strip().lower() in ("1", "true", "yes", "on"):
+        send_telegram("🧪 <b>TON monitor — test ping.</b>\n"
+                      "If you can read this, your Telegram wiring is correct. "
+                      "Real alerts will arrive automatically on the next upstream commit.")
+        print("test ping sent")
+
     state = load_state()
     first_run = not state
     alerts = 0

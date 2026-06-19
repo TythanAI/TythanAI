@@ -12,7 +12,12 @@ name: TON upstream monitor
 on:
   schedule:
     - cron: "*/30 * * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      test_telegram:
+        description: "Send a Telegram test ping to verify wiring"
+        type: boolean
+        default: true
 
 permissions:
   contents: write          # commit the updated state file back
@@ -43,6 +48,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TEST_TELEGRAM: ${{ inputs.test_telegram }}
         run: python monitor/ton_monitor.py
 
       - name: Persist state
