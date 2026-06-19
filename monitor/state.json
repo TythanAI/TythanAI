@@ -1,1 +1,13 @@
-{}
+{
+  "ton-blockchain/dns-contract@main": "d08131031fb659d2826cccc417ddd9b98476f814",
+  "ton-blockchain/multisig-contract@master": "ef8633e284d7d8594f6240c105fd5b31e9412849",
+  "ton-blockchain/mytonctrl@master": "9520ad2fade1c996b3f3083b2daf6cdaf8085244",
+  "ton-blockchain/nominator-pool@main": "2f35c36b5ad662f10fd7b01ef780c3f1949c399d",
+  "ton-blockchain/token-contract@main": "1182ad99413242f09925d50e70ccb7e0e09f94d4",
+  "ton-blockchain/ton@master": "8e6f09172dc95ba3d302cc52ccc3fa9169ef0760",
+  "ton-blockchain/ton@testnet": "e8db1ebaa4afc63acbfd340bb77a9597ea590816",
+  "ton-blockchain/wallet-contract@main": "68b56dc0f7f6a9d41a190a4c91f6dc68b18f0600",
+  "toncenter/pytonlib@main": "e905895d7189105a1c8671dba4a016d33c552ae4",
+  "toncenter/ton-http-api@master": "a0ebc3f71d059438a290fcc46dd7eeedf9eee648",
+  "toncenter/ton-indexer@master": "1fe72ea51d6a402d7ec38299d8c82606ff8066ad"
+}
