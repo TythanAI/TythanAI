@@ -17,7 +17,7 @@ on:
       test_telegram:
         description: "Send a Telegram test ping to verify wiring"
         type: boolean
-        default: true
+        default: false
 
 permissions:
   contents: write          # commit the updated state file back
