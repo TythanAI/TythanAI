@@ -23,8 +23,23 @@ commit to a Claude session for deep triage.
 | `ton-blockchain/nominator-pool` | default |
 | `ton-blockchain/dns-contract` | default |
 | `ton-blockchain/wallet-contract` | default |
+| `ton-blockchain/bug-bounty` | default |
 
-Edit the `REPOS` list in `ton_monitor.py` to add or remove targets.
+That is every in-scope GitHub repo in the official program. Edit the `REPOS`
+list in `ton_monitor.py` to add or remove targets.
+
+**Scope can't silently drift.** The monitor also watches the program itself
+(`ton-blockchain/bug-bounty`) **and** parses its README every run: if the
+program ever lists an in-scope repo that isn't in `REPOS`, you get a
+`⚠️ scope changed` alert telling you to add it. Repos that are intentionally
+**out of scope** (the TON-ETH/BSC/token bridges, the blockchain explorer) are
+listed in `SCOPE_IGNORE` so they don't false-alert — don't add them, reports
+on them are rejected.
+
+**Not covered (by design):** purely web targets in scope — `ton.org`,
+`toncenter.com`, and the HackenProof *ton-society* frontend program — aren't
+git repos, so a commit-watcher can't see them. Those are a separate (web) bug
+class.
 
 ## Setup (≈3 minutes)
 
@@ -67,14 +82,25 @@ branch**. So:
 - On a new commit it pulls the `compare` diff, downloads the new version of the
   changed source files (C/C++, Go, Python, FunC/Tolk/Fift, TS/JS), runs the
   scanner over just those files, and sends one alert.
+- **Security-relevant diff lines come first.** It scans the diff itself for the
+  high-signal TON bug patterns (`check_signature`, `verify`, `skip_check`,
+  `move_as_ok`/`.ensure`/`CHECK(` on parsed input, `throw_unless`, `set_code`,
+  …) and puts the exact `file:line` `+/-` lines at the top of the alert — the
+  fastest lead to a fail-open / skipped-check / crash-on-input bug. A hit here
+  promotes the alert to 🚨.
+- **No commit hides behind another.** If several commits landed since the last
+  run, the alert lists every commit subject in the range, so a security commit
+  isn't masked by whatever happens to be HEAD.
 - First time a ref is seen it is baselined **silently** (no alert) so activation
-  doesn't dump a wall of history.
+  doesn't dump a wall of history. The same is true for the scope baseline.
 
 ## Tuning
 
 - **Frequency:** edit the `cron:` in `.github/workflows/ton-monitor.yml`
-  (`*/30 * * * *` = every 30 min; scheduled runs may be delayed by GitHub under
-  load — normal).
+  (`*/15 * * * *` = every 15 min, to be early; scheduled runs may be delayed by
+  GitHub under load — that only adds latency, never a miss, since each run diffs
+  from the last-seen commit. On a private repo this uses ~2x the Actions minutes
+  of `*/30`; dial back if that matters).
 - **Noise:** the alert header is 🚨 when there are CRITICAL/HIGH findings, 🔔
   otherwise. Every new commit is reported (even with zero findings) so nothing
   upstream slips by — tighten in `build_alert` if you want findings-only.
