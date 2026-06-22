@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -32,6 +33,12 @@ import requests
 # branch "DEFAULT" is resolved to the repo's default branch at runtime so we
 # never 404 on a master/main mismatch. ton-blockchain/ton also gets testnet,
 # which the bounty explicitly accepts.
+#
+# ton-blockchain/bug-bounty is the canonical scope definition itself: watching
+# it means any change to rewards/rules — and crucially any newly added in-scope
+# repo — pings you. discover_scope_repos() below also parses its README and
+# alerts when the program lists a repo this monitor is not yet watching, so the
+# hard-coded list below can never silently fall behind the program.
 # --------------------------------------------------------------------------- #
 REPOS: list[dict] = [
     {"owner": "ton-blockchain", "repo": "ton",                "branches": ["DEFAULT", "testnet"]},
@@ -44,7 +51,24 @@ REPOS: list[dict] = [
     {"owner": "ton-blockchain", "repo": "nominator-pool",     "branches": ["DEFAULT"]},
     {"owner": "ton-blockchain", "repo": "dns-contract",       "branches": ["DEFAULT"]},
     {"owner": "ton-blockchain", "repo": "wallet-contract",    "branches": ["DEFAULT"]},
+    {"owner": "ton-blockchain", "repo": "bug-bounty",         "branches": ["DEFAULT"]},
 ]
+
+# Owners whose repos count as bug-bounty scope when referenced in the program
+# README (used by discover_scope_repos for the scope-drift check).
+SCOPE_OWNERS = {"ton-blockchain", "toncenter"}
+
+# TON repos that appear in the bug-bounty README but are intentionally NOT
+# watched: explicitly out of scope per the program (the bridges, the explorer)
+# or the program description itself. Listing them here keeps the scope-drift
+# detector from false-alerting on known exclusions.
+SCOPE_IGNORE = {
+    "ton-blockchain/bug-bounty",             # the program description itself
+    "ton-blockchain/bridge-solidity",        # TON-ETH / TON-BSC bridge — OUT of scope
+    "ton-blockchain/token-bridge-solidity",  # TON-ETH token bridge     — OUT of scope
+    "ton-blockchain/bridge",                 # bridge frontend          — OUT of scope
+    "ton-blockchain/ton-explorer",           # blockchain explorer      — OUT of scope
+}
 
 # Source extensions worth feeding to the scanner.
 SCANNABLE = {
@@ -54,6 +78,19 @@ SCANNABLE = {
     ".fc", ".func", ".tolk", ".fift", ".fif",                   # contracts
     ".ts", ".js",                                               # misc tooling
 }
+
+# Security-relevant diff signal (ported from watch.sh): added/removed lines that
+# touch verification / auth / parsing / crash-prone spots. A hit here is the
+# primary lead for a TON bounty — fail-open guard, skipped signature check,
+# ignored verify result, or a crash on attacker-controlled input — and is shown
+# at the top of the alert. Covers both the C++ core and FunC/Tolk contract idioms.
+SECURITY_PAT = re.compile(
+    r"check_signature|signature|verify|eligible|Forbidden|Allowed|rate[_ ]?limit|"
+    r"RateLimiter|skip_check|accept_message|deserialize|fetch_tl|->check\(|\.check\(|"
+    r"\.ensure\(|CHECK\(|is_error\(\)|move_as_ok|Certificate|public_key|pubkey|"
+    r"throw_unless|throw_if|set_code|recv_external|recv_internal|raw_reserve|"
+    r"send_raw_message|set_data|seqno"
+)
 
 MAX_FILES_PER_COMMIT = 80          # cap downloads on huge merges
 MAX_FILE_BYTES = 1_500_000         # skip generated/huge blobs
@@ -129,6 +166,70 @@ def head_commit(owner: str, repo: str, branch: str) -> dict | None:
 def compare(owner: str, repo: str, base: str, head: str) -> dict | None:
     r = _get(f"{GITHUB_API}/repos/{owner}/{repo}/compare/{base}...{head}")
     return r.json() if r else None
+
+
+_HUNK_HDR = re.compile(r"^@@ .*?\+(\d+)")
+
+
+def security_hunks(files: list[dict]) -> list[dict]:
+    """Scan the compare patches for security-relevant added/removed lines.
+
+    This is the watch.sh signal brought into the monitor: it reads the unified
+    diff GitHub already returns (no extra downloads) and surfaces the exact +/-
+    lines matching SECURITY_PAT, with the new-file line number for additions.
+    Returns [{file, line, sign, text}], newest-severity-first by nature of order.
+    """
+    out: list[dict] = []
+    for f in files:
+        name = f.get("filename", "")
+        if Path(name).suffix.lower() not in SCANNABLE:
+            continue
+        patch = f.get("patch")
+        if not patch:                       # binary/huge files have no patch
+            continue
+        new_ln = 0
+        for raw in patch.splitlines():
+            if raw.startswith("@@"):
+                m = _HUNK_HDR.match(raw)
+                new_ln = int(m.group(1)) if m else 0
+                continue
+            if raw.startswith(("+++", "---")):
+                continue
+            if raw.startswith("+"):
+                body = raw[1:]
+                if SECURITY_PAT.search(body):
+                    out.append({"file": name, "line": new_ln, "sign": "+",
+                                "text": body.strip()[:140]})
+                new_ln += 1
+            elif raw.startswith("-"):
+                body = raw[1:]
+                if SECURITY_PAT.search(body):
+                    out.append({"file": name, "line": new_ln, "sign": "-",
+                                "text": body.strip()[:140]})
+                # removed line: new-file line number does not advance
+            else:
+                new_ln += 1
+            if len(out) >= 40:              # cap; Telegram has a hard size limit
+                return out
+    return out
+
+
+_GH_REPO_RE = re.compile(r"github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)")
+
+
+def discover_scope_repos() -> set[str] | None:
+    """Parse the canonical bug-bounty README and return the set of in-scope
+    'owner/repo' under known TON orgs. Returns None on fetch failure so the
+    caller skips the scope-drift check silently rather than crashing the run."""
+    r = _get(f"{GITHUB_API}/repos/ton-blockchain/bug-bounty/readme", raw=True)
+    if not r:
+        return None
+    found: set[str] = set()
+    for owner, repo in _GH_REPO_RE.findall(r.text):
+        repo = repo.removesuffix(".git")
+        if owner.lower() in SCOPE_OWNERS:
+            found.add(f"{owner}/{repo}")
+    return found
 
 
 # --------------------------------------------------------------------------- #
@@ -215,19 +316,34 @@ SEV_ICON = {"CRITICAL": "🔴", "HIGH": "🟠", "MEDIUM": "🟡", "LOW": "🔵",
 SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"]
 
 
-def build_alert(owner, repo, branch, commit, files, scanned, result) -> str:
+def build_alert(owner, repo, branch, commit, files, scanned, result,
+                hunks=None, commits=None) -> str:
     findings = result.get("findings", []) or []
+    hunks = hunks or []
+    commits = commits or []
     by_sev: dict[str, int] = {}
     for f in findings:
-        by_sev[(f.get("severity") or "INFO").upper()] = by_sev.get((f.get("severity") or "INFO").upper(), 0) + 1
+        sev = (f.get("severity") or "INFO").upper()
+        by_sev[sev] = by_sev.get(sev, 0) + 1
 
-    actionable = sum(by_sev.get(s, 0) for s in ("CRITICAL", "HIGH"))
+    # A security-relevant diff hit is, for TON, as actionable as a SAST CRITICAL.
+    actionable = sum(by_sev.get(s, 0) for s in ("CRITICAL", "HIGH")) or bool(hunks)
     head = "🚨" if actionable else "🔔"
     lines = [f"{head} <b>{_esc(owner)}/{_esc(repo)}</b> @ <code>{_esc(branch)}</code>",
              "",
              f"<b>{_esc(commit['message'])}</b>",
              f"<code>{commit['sha'][:10]}</code> · {_esc(commit['author'])} · {_esc(commit['date'][:10])}",
              commit["url"], ""]
+
+    # If several commits landed between runs, list their subjects so a
+    # security-relevant one is never hidden behind the HEAD subject.
+    if len(commits) > 1:
+        lines.append(f"🧩 {len(commits)} commits in range:")
+        for sub in commits[-8:]:
+            lines.append(f"   • {_esc(sub[:90])}")
+        if len(commits) > 8:
+            lines.append(f"   … +{len(commits) - 8} earlier")
+        lines.append("")
 
     code_files = [f for f in files if Path(f).suffix.lower() in SCANNABLE]
     lines.append(f"📄 {len(files)} files changed ({len(code_files)} code, {len(scanned)} scanned)")
@@ -236,6 +352,16 @@ def build_alert(owner, repo, branch, commit, files, scanned, result) -> str:
     if len(code_files) > 12:
         lines.append(f"   … +{len(code_files) - 12} more")
     lines.append("")
+
+    # Primary lead: security-relevant diff lines (audit these first).
+    if hunks:
+        lines.append(f"🔑 <b>{len(hunks)} security-relevant diff line(s)</b> — audit first:")
+        for h in hunks[:12]:
+            lines.append(f"   <code>{_esc(h['file'])}:{h['line']}</code>")
+            lines.append(f"   <code>{_esc(h['sign'])} {_esc(h['text'])}</code>")
+        if len(hunks) > 12:
+            lines.append(f"   … +{len(hunks) - 12} more")
+        lines.append("")
 
     if findings:
         summary = "  ".join(f"{SEV_ICON.get(s,'')}{s[:4]} {by_sev[s]}"
@@ -255,11 +381,12 @@ def build_alert(owner, repo, branch, commit, files, scanned, result) -> str:
                 lines.append(f"   {_esc(msg)}")
         if len(findings) > 8:
             lines.append(f"   … +{len(findings) - 8} more findings")
-        if actionable:
-            lines.append("")
-            lines.append("➡️ <i>Actionable hits — bring to a Claude session for deep triage.</i>")
     else:
         lines.append("🔎 SAST: no findings on the diff (commit still worth a glance).")
+
+    if actionable:
+        lines.append("")
+        lines.append("➡️ <i>Actionable — bring to a Claude session for deep triage.</i>")
 
     return "\n".join(lines)
 
@@ -324,6 +451,12 @@ def main() -> int:
             cmp = compare(owner, repo, prev, commit["sha"])
             files = (cmp or {}).get("files", []) or []
             filenames = [f.get("filename", "") for f in files]
+            commit_subjects = [
+                (c.get("commit", {}).get("message") or "").splitlines()[0]
+                for c in (cmp or {}).get("commits", []) or []
+                if (c.get("commit", {}).get("message") or "").strip()
+            ]
+            hunks = security_hunks(files)        # watch.sh-style security diff lines
 
             scanned: list[str] = []
             result = {"total": 0, "findings": [], "by_severity": {}}
@@ -334,8 +467,29 @@ def main() -> int:
                 if scanned:
                     result = run_scanner(scan_dir)
 
-            send_telegram(build_alert(owner, repo, branch, commit, filenames, scanned, result))
+            send_telegram(build_alert(owner, repo, branch, commit, filenames,
+                                      scanned, result, hunks, commit_subjects))
             alerts += 1
+
+    # ---- scope drift: tell me when the program lists a repo I don't watch ----
+    # Cross-checks the canonical bug-bounty README so the hard-coded REPOS list
+    # can never silently fall behind a newly added in-scope repo. Alerts only
+    # when the set of unmonitored in-scope repos *changes* (no per-run spam).
+    discovered = discover_scope_repos()
+    if discovered is not None:
+        monitored = {f"{e['owner']}/{e['repo']}" for e in REPOS}
+        unmonitored = sorted(discovered - monitored - SCOPE_IGNORE)
+        if unmonitored != state.get("__scope_unmonitored__"):
+            state["__scope_unmonitored__"] = unmonitored
+            changed_state = True
+            if not first_run and unmonitored:
+                msg = ["⚠️ <b>TON bug-bounty scope changed</b>", "",
+                       "In-scope repo(s) this monitor is NOT watching yet:"]
+                for rr in unmonitored:
+                    msg.append(f"   • <code>{_esc(rr)}</code>  https://github.com/{rr}")
+                msg += ["", "➡️ <i>Add them to REPOS in monitor/ton_monitor.py.</i>"]
+                send_telegram("\n".join(msg))
+                alerts += 1
 
     if changed_state:
         save_state(state)

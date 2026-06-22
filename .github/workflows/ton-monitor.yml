@@ -7,11 +7,17 @@ name: TON upstream monitor
 # NOTE: GitHub only fires `schedule:` for workflow files that live on the
 # repository's DEFAULT branch. While this lives on a feature branch you can run
 # it manually via the "Run workflow" button (workflow_dispatch). Merge it to the
-# default branch to activate the every-30-minutes cron.
+# default branch to activate the every-15-minutes cron.
+#
+# Cadence is */15 to be early. GitHub throttles/delays high-frequency cron under
+# load, so a run can slip — that only adds latency, never a miss: each run diffs
+# from the last-seen commit in state.json, so every intermediate commit is still
+# caught. On a private repo this burns ~2x Actions minutes vs */30; dial back if
+# that matters.
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
       test_telegram:
