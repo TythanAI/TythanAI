@@ -392,6 +392,14 @@ def build_alert(owner, repo, branch, commit, files, scanned, result,
     if actionable:
         lines.append("")
         lines.append("➡️ <i>Actionable — bring to a Claude session for deep triage.</i>")
+        # When there's a security-relevant diff lead, point at TON's own PoC kit:
+        # tvm-fift-hypothesis-proving (prove/reject TVM crash/gas/opcode hypotheses)
+        # and ton-bug-triage (reproduce on a local tontester net). A proven PoC is
+        # what the bounty requires before a report is accepted.
+        if hunks:
+            lines.append("🧪 <i>PoC kit:</i> ton-triage-skill "
+                         "(tvm-fift-hypothesis-proving · ton-bug-triage)")
+            lines.append("https://github.com/ton-blockchain/ton-triage-skill")
 
     return "\n".join(lines)
 
