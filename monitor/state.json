@@ -1,11 +1,5 @@
 {
-  "__scope_unmonitored__": [
-    "ton-blockchain/mytonctrl.",
-    "ton-blockchain/ton-triage-skill",
-    "ton-blockchain/ton.",
-    "ton-blockchain/wallet-contract.",
-    "toncenter/pytonlib."
-  ],
+  "__scope_unmonitored__": [],
   "ton-blockchain/bug-bounty@main": "52db73b98ffd3173ecdbb21da770f15540e413c0",
   "ton-blockchain/dns-contract@main": "d08131031fb659d2826cccc417ddd9b98476f814",
   "ton-blockchain/multisig-contract@master": "ef8633e284d7d8594f6240c105fd5b31e9412849",
