@@ -59,15 +59,17 @@ REPOS: list[dict] = [
 SCOPE_OWNERS = {"ton-blockchain", "toncenter"}
 
 # TON repos that appear in the bug-bounty README but are intentionally NOT
-# watched: explicitly out of scope per the program (the bridges, the explorer)
-# or the program description itself. Listing them here keeps the scope-drift
-# detector from false-alerting on known exclusions.
+# watched: explicitly out of scope per the program (the bridges, the explorer),
+# the program description itself, or tooling/skill repos merely *referenced* by
+# the README (not bounty targets). Listing them here keeps the scope-drift
+# detector from false-alerting on known non-targets.
 SCOPE_IGNORE = {
     "ton-blockchain/bug-bounty",             # the program description itself
     "ton-blockchain/bridge-solidity",        # TON-ETH / TON-BSC bridge — OUT of scope
     "ton-blockchain/token-bridge-solidity",  # TON-ETH token bridge     — OUT of scope
     "ton-blockchain/bridge",                 # bridge frontend          — OUT of scope
     "ton-blockchain/ton-explorer",           # blockchain explorer      — OUT of scope
+    "ton-blockchain/ton-triage-skill",       # PoC-crafting helper skills referenced in the README, not a target
 }
 
 # Source extensions worth feeding to the scanner.
@@ -226,8 +228,11 @@ def discover_scope_repos() -> set[str] | None:
         return None
     found: set[str] = set()
     for owner, repo in _GH_REPO_RE.findall(r.text):
-        repo = repo.removesuffix(".git")
-        if owner.lower() in SCOPE_OWNERS:
+        # Strip ".git" and any trailing punctuation the prose glued on (a URL at
+        # the end of a sentence yields "wallet-contract." / "mytonctrl."). A
+        # GitHub repo name may contain a dot but never ends in one, so this is safe.
+        repo = re.sub(r"[^A-Za-z0-9_-]+$", "", repo.removesuffix(".git"))
+        if repo and owner.lower() in SCOPE_OWNERS:
             found.add(f"{owner}/{repo}")
     return found
 
