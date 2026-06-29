@@ -24,6 +24,7 @@ Options:
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import os
 import sys
@@ -38,6 +39,8 @@ if str(_HERE) not in sys.path:
 from community.gates import PREMIUM_FEATURES, UPGRADE_URL
 from community.scanner import CommunityScanner
 from community.report import write_sarif, write_html
+from community.vex import write_vex
+from community.policy import Policy, evaluate
 
 # ─── ANSI colours (graceful fallback on Windows/CI) ──────────────────────────
 
@@ -230,6 +233,130 @@ def cmd_version(args) -> int:
     return 0
 
 
+# ─── CI gate (scan → SARIF + VEX → policy gate, one command) ──────────────────
+
+def _resolve_policy(args, target: str) -> Policy:
+    """
+    Resolve the gate policy: explicit --policy file, else an auto-discovered
+    config in the target/cwd, else the built-in default. CLI flags (--fail-on,
+    --max-*) always override whatever the base policy says.
+    """
+    if args.policy:
+        base = Policy.from_file(args.policy)
+    else:
+        base = Policy.discover(target, os.getcwd()) or Policy.default()
+
+    overrides: dict = {}
+    if args.fail_on is not None:
+        overrides["fail_on"] = args.fail_on.upper()
+    for attr in ("max_critical", "max_high", "max_medium", "max_low", "max_total"):
+        val = getattr(args, attr)
+        if val is not None:
+            overrides[attr] = val
+    if args.fail_on_scan_errors:
+        overrides["fail_on_scan_errors"] = True
+
+    if overrides:
+        # Validate the merged fail_on through from_dict, then keep the rest.
+        if "fail_on" in overrides:
+            Policy.from_dict({"fail_on": overrides["fail_on"]})
+        base = dataclasses.replace(base, **overrides)
+    return base
+
+
+def _print_gate(decision, policy: Policy) -> None:
+    print()
+    print(BOLD("━" * 60))
+    if decision.passed:
+        print(BOLD(GREEN("  GATE: PASS")))
+    else:
+        print(BOLD(RED("  GATE: FAIL")))
+    print(BOLD("━" * 60))
+    c = decision.counts
+    print(f"  Policy    : fail_on={policy.fail_on}"
+          + (f", max_total={policy.max_total}" if policy.max_total is not None else ""))
+    print(f"  Findings  : {decision.total} considered"
+          + (f", {decision.ignored} allowlisted" if decision.ignored else ""))
+    print(f"  {RED('CRITICAL')} {c['CRITICAL']}   {_c('31;1','HIGH')} {c['HIGH']}   "
+          f"{YELLOW('MEDIUM')} {c['MEDIUM']}   {CYAN('LOW')} {c['LOW']}")
+    if decision.reasons:
+        print()
+        print(YELLOW("  Gate failed because:"))
+        for r in decision.reasons:
+            print(f"    {RED('✗')} {r}")
+    print(BOLD("━" * 60))
+
+
+def cmd_ci(args) -> int:
+    target = args.target
+    if not Path(target).exists():
+        print(RED(f"Error: target not found: {target}"), file=sys.stderr)
+        return 2
+
+    if not args.quiet:
+        _print_banner()
+        print(f"  CI scan: {BOLD(target)} …\n")
+
+    t0 = time.monotonic()
+    scanner = CommunityScanner(target)
+    result = scanner.run(
+        sast=not args.no_sast,
+        sca=not args.no_sca,
+        secrets=not args.no_secrets,
+        iac=not args.no_iac,
+        web3=not args.no_web3,
+    )
+    elapsed = time.monotonic() - t0
+
+    _print_findings(result, args.quiet)
+    _print_summary(result)
+
+    # ── Artifacts: SARIF + VEX by default, JSON/HTML on request ───────────────
+    sarif_path = args.sarif or ("tythanai.sarif" if not args.no_artifacts else None)
+    vex_path = args.vex or ("tythanai.openvex.json" if not args.no_artifacts else None)
+
+    written: list[str] = []
+    if sarif_path:
+        write_sarif(result, sarif_path)
+        written.append(f"SARIF → {sarif_path}")
+    if vex_path:
+        doc = write_vex(result, vex_path)
+        written.append(f"OpenVEX → {vex_path} ({len(doc['statements'])} statement(s))")
+    if args.html:
+        write_html(result, args.html)
+        written.append(f"HTML  → {args.html}")
+    if args.json:
+        payload = {
+            "target": result.target,
+            "risk_level": result.risk_level(),
+            "risk_score": result.risk_score(),
+            "total": result.total,
+            "by_severity": result.by_severity,
+            "findings": result.all_findings,
+        }
+        Path(args.json).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        written.append(f"JSON  → {args.json}")
+
+    if written and not args.quiet:
+        print()
+        print(BOLD("  ARTIFACTS"))
+        for w in written:
+            print(f"    {w}")
+
+    # ── Policy gate ───────────────────────────────────────────────────────────
+    policy = _resolve_policy(args, target)
+    decision = evaluate(result, policy)
+    _print_gate(decision, policy)
+
+    if not args.quiet:
+        print(DIM(f"  Completed in {elapsed:.1f}s"))
+        print()
+
+    if args.exit_zero:
+        return 0
+    return decision.exit_code
+
+
 # ─── Argument parser ──────────────────────────────────────────────────────────
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -251,6 +378,42 @@ def _build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--json",  metavar="FILE")
     scan.add_argument("--quiet", "-q", action="store_true")
 
+    # ── ci: scan → SARIF + VEX → policy gate, one command for pipelines ───────
+    ci = sub.add_parser(
+        "ci",
+        help="One-shot CI gate: scan, emit SARIF + OpenVEX, enforce a policy",
+    )
+    ci.add_argument("target", help="Path to scan")
+    ci.add_argument("--no-sast",    action="store_true")
+    ci.add_argument("--no-sca",     action="store_true")
+    ci.add_argument("--no-secrets", action="store_true")
+    ci.add_argument("--no-iac",     action="store_true")
+    ci.add_argument("--no-web3",    action="store_true")
+    ci.add_argument("--sarif", metavar="FILE",
+                    help="SARIF output path (default: tythanai.sarif)")
+    ci.add_argument("--vex", metavar="FILE",
+                    help="OpenVEX output path (default: tythanai.openvex.json)")
+    ci.add_argument("--html", metavar="FILE")
+    ci.add_argument("--json", metavar="FILE")
+    ci.add_argument("--no-artifacts", action="store_true",
+                    help="Do not write default SARIF/VEX artifacts")
+    ci.add_argument("--policy", metavar="FILE",
+                    help="Policy config (.tythanai.yml / .json); auto-discovered if omitted")
+    ci.add_argument("--fail-on", metavar="LEVEL", default=None,
+                    help="Severity floor that fails the build "
+                         "(CRITICAL|HIGH|MEDIUM|LOW|INFO|NONE; default HIGH)")
+    ci.add_argument("--max-critical", type=int, default=None, dest="max_critical")
+    ci.add_argument("--max-high",     type=int, default=None, dest="max_high")
+    ci.add_argument("--max-medium",   type=int, default=None, dest="max_medium")
+    ci.add_argument("--max-low",      type=int, default=None, dest="max_low")
+    ci.add_argument("--max-total",    type=int, default=None, dest="max_total")
+    ci.add_argument("--fail-on-scan-errors", action="store_true",
+                    dest="fail_on_scan_errors",
+                    help="Fail the gate if any scanner errored (partial scan)")
+    ci.add_argument("--exit-zero", action="store_true",
+                    help="Always exit 0 (report-only; still writes artifacts)")
+    ci.add_argument("--quiet", "-q", action="store_true")
+
     sub.add_parser("version", help="Show version information")
 
     return p
@@ -262,6 +425,8 @@ def main() -> None:
 
     if args.command == "scan":
         sys.exit(cmd_scan(args))
+    elif args.command == "ci":
+        sys.exit(cmd_ci(args))
     elif args.command == "version":
         sys.exit(cmd_version(args))
     else:

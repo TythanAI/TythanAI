@@ -89,6 +89,39 @@ tythanai scan ./myproject --quiet
 
 Exit code is non-zero when findings are present, so it drops straight into CI.
 
+### One command for CI — `tythanai ci`
+
+`tythanai ci` wires the whole pipeline into a single step: **scan → SARIF →
+[OpenVEX](https://github.com/openvex/spec) → policy gate**. It writes both
+artifacts by default and exits non-zero only when your policy is violated, so
+the build fails for a *reason you chose*, not just because findings exist.
+
+```bash
+# Fail the build on any CRITICAL or HIGH (the default policy)
+tythanai ci .
+
+# Set the bar yourself
+tythanai ci . --fail-on CRITICAL          # only block on CRITICAL
+tythanai ci . --max-high 0 --max-medium 5 # explicit budgets
+tythanai ci . --exit-zero                 # report-only (still writes artifacts)
+```
+
+Artifacts written by default: `tythanai.sarif` (GitHub Code Scanning) and
+`tythanai.openvex.json` (VEX for Grype/Trivy and SBOM tooling). The gate is
+deterministic and explainable — every reason the build fails is printed.
+
+A policy can live in the repo as `.tythanai.yml` and is auto-discovered:
+
+```yaml
+# .tythanai.yml
+fail_on: HIGH          # CRITICAL | HIGH | MEDIUM | LOW | INFO | NONE
+max_critical: 0
+ignore_ids:            # findings you have triaged and accepted
+  - CVE-2020-14343
+```
+
+See **[docs/CI.md](docs/CI.md)** for the full reference.
+
 ### GitHub Actions
 
 ```yaml
@@ -100,8 +133,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: pip install tythanai-community
-      - run: tythanai scan . --sarif results.sarif
-      - uses: github/codeql-action/upload-sarif@v3
+      # Scan, emit SARIF + OpenVEX, and fail the build on the policy gate
+      - run: tythanai ci . --sarif results.sarif
+      - if: always()                       # upload findings even when the gate fails
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: results.sarif
 ```
