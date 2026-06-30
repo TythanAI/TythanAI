@@ -2,7 +2,7 @@
   "__scope_unmonitored__": [
     "ton-blockchain/multisig-contract-v2"
   ],
-  "ton-blockchain/bug-bounty@main": "76275770690949fd289810b7ba6b5c2c4f11397a",
+  "ton-blockchain/bug-bounty@main": "93dfaa8b9946f410c96e60fa59afb8fa818e5f8b",
   "ton-blockchain/dns-contract@main": "d08131031fb659d2826cccc417ddd9b98476f814",
   "ton-blockchain/multisig-contract@master": "ef8633e284d7d8594f6240c105fd5b31e9412849",
   "ton-blockchain/mytonctrl@master": "9520ad2fade1c996b3f3083b2daf6cdaf8085244",
