@@ -76,7 +76,11 @@ def handle_slash(command: str, agent: Agent, ui: UI, providers: dict) -> bool:
     elif name == "/model":
         if arg:
             agent.backend.model = arg
-            ui.info(f"model set to {arg}")
+            ui.info(
+                f"model set to {arg} — context window stays at {agent.backend.context_window} "
+                "(set context_window for this provider in ~/.minicursor/config.json if the new "
+                "model's real window differs; check with /context)"
+            )
         else:
             ui.info(f"current: {agent.backend.describe()}")
     elif name == "/effort":
@@ -114,12 +118,15 @@ def handle_slash(command: str, agent: Agent, ui: UI, providers: dict) -> bool:
         if checkpoint is None:
             ui.info("nothing to undo")
         else:
-            note = ""
-            if checkpoint.skipped_large:
-                note = f" (note: {len(checkpoint.skipped_large)} large file(s) in this checkpoint weren't covered)"
+            skipped = checkpoint.skipped_large + checkpoint.skipped_binary
+            note = f" (note: {len(skipped)} large/binary file(s) in this checkpoint weren't covered)" if skipped else ""
             ui.info(f'reverted {len(checkpoint.changes)} file(s) from "{checkpoint.label}"{note}')
     elif name == "/checkpoints":
-        ui.checkpoints_list(agent.checkpoints.list())
+        try:
+            limit = int(arg) if arg else 10
+        except ValueError:
+            limit = 10
+        ui.checkpoints_list(agent.checkpoints.list(limit=limit), total=agent.checkpoints.count())
     else:
         ui.info(f"unknown command: {name} (try /help)")
     return True
@@ -127,7 +134,10 @@ def handle_slash(command: str, agent: Agent, ui: UI, providers: dict) -> bool:
 
 def run_turn_safely(agent: Agent, ui: UI, text: str) -> None:
     try:
-        agent.run_turn(expand_mentions(text, agent.workspace))
+        # Pass the raw text as the checkpoint label — expand_mentions() inlines
+        # full file contents into what the model sees, which would otherwise
+        # end up as unreadable noise in /checkpoints.
+        agent.run_turn(expand_mentions(text, agent.workspace), label=text)
     except anthropic.AuthenticationError:
         ui.error(
             "authentication failed — set ANTHROPIC_API_KEY (or log in with `ant auth login`) and retry"
@@ -192,8 +202,17 @@ def main(argv: list[str] | None = None) -> int:
         if not text:
             continue
         if text.startswith("/"):
-            if not handle_slash(text, agent, ui, providers):
-                break
+            try:
+                if not handle_slash(text, agent, ui, providers):
+                    break
+            except KeyboardInterrupt:
+                ui.info("\ninterrupted")
+            except Exception as exc:
+                # A slash command failing (e.g. /undo hitting a disk error) must
+                # drop back to the prompt, not take the whole session down —
+                # unlike run_turn_safely's LLM-turn path, these have no reason
+                # to ever propagate.
+                ui.error(f"{type(exc).__name__}: {exc}")
             continue
         run_turn_safely(agent, ui, text)
 

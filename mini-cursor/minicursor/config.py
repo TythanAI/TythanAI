@@ -84,7 +84,7 @@ class ProviderConfig:
 
 def default_context_window(pcfg: ProviderConfig) -> int:
     """Best-effort context window for a provider that didn't set one explicitly."""
-    if pcfg.context_window:
+    if pcfg.context_window is not None:
         return pcfg.context_window
     if pcfg.type == "anthropic":
         return DEFAULT_ANTHROPIC_CONTEXT_WINDOW

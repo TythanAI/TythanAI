@@ -150,7 +150,7 @@ class UI:
         answer = self.console.input(f"[bold]{prompt}[/bold] [dim]\\[y/N][/dim] ")
         return answer.strip().lower() in ("y", "yes", "д", "да")
 
-    def checkpoints_list(self, checkpoints: list) -> None:
+    def checkpoints_list(self, checkpoints: list, total: int | None = None) -> None:
         if not checkpoints:
             self.console.print("[dim]no checkpoints yet — checkpoints are created when the "
                                "assistant writes or edits a file[/dim]")
@@ -164,4 +164,7 @@ class UI:
             body.append(f"{ts}  ", style="dim")
             body.append(f"{len(cp.changes)} file(s)  ", style="bold")
             body.append(f"{cp.label}{marker}\n")
-        self.console.print(Panel(body, title=f"checkpoints ({len(checkpoints)})", border_style="cyan"))
+        title = f"checkpoints ({len(checkpoints)})"
+        if total is not None and total > len(checkpoints):
+            title = f"checkpoints (showing {len(checkpoints)} of {total} — /checkpoints <n> to see more)"
+        self.console.print(Panel(body, title=title, border_style="cyan"))

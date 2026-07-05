@@ -7,6 +7,7 @@ import json
 import anthropic
 
 from ..config import Config, ProviderConfig, default_context_window
+from ..tools import truncate
 from ..ui import UI
 from .base import Backend, ToolCall, ToolResult, TurnResult
 
@@ -136,11 +137,12 @@ class AnthropicBackend(Backend):
                     inp = getattr(block, "input", None)
                     if inp is None and isinstance(block, dict):
                         inp = block.get("input")
-                    lines.append(f"{role} called tool {name}({json.dumps(inp, default=str, ensure_ascii=False)[:500]})")
+                    args = truncate(json.dumps(inp, default=str, ensure_ascii=False), 500)
+                    lines.append(f"{role} called tool {name}({args})")
                 elif btype == "tool_result":
                     out = block.get("content") if isinstance(block, dict) else getattr(block, "content", "")
                     text = out if isinstance(out, str) else json.dumps(out, default=str, ensure_ascii=False)
-                    lines.append(f"tool result: {text[:1000]}")
+                    lines.append(f"tool result: {truncate(text, 1000)}")
                 # "thinking" blocks are internal reasoning — skip them in the summary transcript.
         return "\n".join(lines)
 

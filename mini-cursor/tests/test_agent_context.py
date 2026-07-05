@@ -271,3 +271,84 @@ def test_run_turn_resets_compaction_unavailable_flag_each_turn(tmp_path):
     agent._compaction_unavailable = True
     agent.run_turn("hello")
     assert agent._compaction_unavailable is False
+
+
+# -- token_budget ---------------------------------------------------------
+
+
+def test_token_budget_caps_reserve_for_small_local_context_windows(tmp_path):
+    """A small context_window (e.g. the 8k local-model default) must not have
+    the full default max_tokens (64k) reserved out of it — that would leave
+    almost nothing for actual conversation and trigger compaction constantly."""
+    backend = ScriptedBackend([], context_window=8_000)
+    agent = make_agent(tmp_path, backend)  # default max_tokens is 64_000
+    # reserve = min(64_000, 8_000 // 2) = 4_000 -> budget = 8_000 - 4_000 = 4_000
+    assert agent.token_budget() == 4_000
+
+
+def test_token_budget_unaffected_for_large_context_windows(tmp_path):
+    """For a large window where max_tokens is already well under half of it,
+    the cap must not change anything (no regression for the common/default case)."""
+    backend = ScriptedBackend([], context_window=200_000)
+    agent = make_agent(tmp_path, backend)  # max_tokens defaults to 64_000
+    assert agent.token_budget() == 200_000 - 64_000
+
+
+# -- checkpoint label -------------------------------------------------------
+
+
+def test_run_turn_uses_explicit_label_for_checkpoint_over_user_input(tmp_path):
+    turns = [
+        TurnResult("tool_use", [ToolCall(id="tu_1", name="write_file",
+                                          input={"path": "a.txt", "content": "v1"})]),
+        TurnResult("end"),
+    ]
+    agent = make_agent(tmp_path, ScriptedBackend(turns))
+    expanded = "@notes.md summarize this\n\n<file path=\"notes.md\">huge file contents...</file>"
+    agent.run_turn(expanded, label="@notes.md summarize this")
+
+    cps = agent.checkpoints.list()
+    assert len(cps) == 1
+    assert cps[0].label == "@notes.md summarize this"
+    # The model still sees the full expanded text as its actual input.
+    assert agent.messages[0]["content"] == expanded
+
+
+def test_run_turn_label_defaults_to_user_input(tmp_path):
+    agent = make_agent(tmp_path, ScriptedBackend([
+        TurnResult("tool_use", [ToolCall(id="tu_1", name="write_file",
+                                          input={"path": "a.txt", "content": "v1"})]),
+        TurnResult("end"),
+    ]))
+    agent.run_turn("create a.txt")
+    assert agent.checkpoints.list()[0].label == "create a.txt"
+
+
+# -- finally-block resilience ----------------------------------------------
+
+
+def test_run_turn_survives_commit_turn_raising_oserror(tmp_path, monkeypatch):
+    """A disk error while saving the checkpoint must not crash run_turn, and
+    must not replace/hide a real exception already propagating from the turn."""
+    agent = make_agent(tmp_path, ScriptedBackend([TurnResult("end")]))
+
+    def boom():
+        raise OSError("disk full")
+
+    monkeypatch.setattr(agent.checkpoints, "commit_turn", boom)
+    agent.run_turn("hello")  # must not raise
+
+
+def test_run_turn_commit_turn_oserror_does_not_mask_real_exception(tmp_path, monkeypatch):
+    class ExplodingBackend(ScriptedBackend):
+        def stream_turn(self, messages, system, tools, ui):
+            raise ConnectionError("network down")
+
+    agent = make_agent(tmp_path, ExplodingBackend([]))
+    monkeypatch.setattr(agent.checkpoints, "commit_turn", lambda: (_ for _ in ()).throw(OSError("disk full")))
+
+    try:
+        agent.run_turn("hello")
+        assert False, "expected ConnectionError to propagate"
+    except ConnectionError:
+        pass  # the *original* exception must win, not the finally-block's OSError

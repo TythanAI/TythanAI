@@ -51,7 +51,11 @@ confirmation.
   is written to `~/.minicursor` until a file actually changes. Shell commands
   run via `run_command` aren't covered — there's no honest way to snapshot and
   revert arbitrary shell effects, so this is a safety net for agent-authored
-  edits, not a full undo of everything the agent does.
+  edits, not a full undo of everything the agent does. Files over 5MB or that
+  aren't valid UTF-8 are skipped rather than checkpointed (so `/undo` never
+  "restores" a lossy, corrupted copy) — mini-cursor tells you when this
+  happens. `/checkpoints [n]` lists recent checkpoints (10 by default, up to
+  the 50 retained per workspace).
 - **Automatic context compaction** — long sessions don't hit a hard
   context-length error. When the conversation approaches the model's context
   window, mini-cursor summarizes the older turns into one message and keeps
@@ -125,12 +129,12 @@ minicursor --no-checkpoints          # don't record file checkpoints (disables /
 | `/help` | show help |
 | `/clear` | reset the conversation |
 | `/provider [name]` | list providers / switch (resets the chat) |
-| `/model <id>` | switch model within the current provider |
+| `/model <id>` | switch model within the current provider (context window stays as configured for the provider — see `/context`) |
 | `/effort <lvl>` | `low` / `medium` / `high` / `xhigh` / `max` (Anthropic) |
 | `/audit [path]` | offline security scan of the workspace (or a subpath) |
 | `/yolo` | toggle confirmation prompts |
 | `/undo` | revert the file changes from the last turn |
-| `/checkpoints` | list recent undo checkpoints |
+| `/checkpoints [n]` | list recent undo checkpoints (10 by default) |
 | `/compact` | summarize older history now to free up context |
 | `/context` | show estimated context usage vs. the model's window |
 | `/exit` or Ctrl+D | quit |

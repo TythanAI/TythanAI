@@ -63,6 +63,7 @@ class Checkpoint:
     label: str
     changes: list[FileChange] = field(default_factory=list)
     skipped_large: list[str] = field(default_factory=list)
+    skipped_binary: list[str] = field(default_factory=list)
 
     def to_json(self) -> dict:
         return {
@@ -71,16 +72,18 @@ class Checkpoint:
             "label": self.label,
             "changes": [c.to_json() for c in self.changes],
             "skipped_large": self.skipped_large,
+            "skipped_binary": self.skipped_binary,
         }
 
     @staticmethod
     def from_json(d: dict) -> "Checkpoint":
         return Checkpoint(
-            id=d["id"],
-            created_at=d["created_at"],
-            label=d.get("label", ""),
+            id=str(d["id"]),
+            created_at=float(d["created_at"]),
+            label=str(d.get("label", "")),
             changes=[FileChange.from_json(c) for c in d.get("changes", [])],
             skipped_large=list(d.get("skipped_large", [])),
+            skipped_binary=list(d.get("skipped_binary", [])),
         )
 
 
@@ -113,12 +116,22 @@ class CheckpointStore:
         )
 
     def record_before(self, target: Path) -> None:
-        """Capture `target`'s current (pre-mutation) content, once per turn per path."""
+        """Capture `target`'s current (pre-mutation) content, once per turn per path.
+
+        Only ever called for paths write_file/edit_file are *about* to touch —
+        the actual write/edit may still go on to fail its own validation (e.g.
+        `target` turns out to be a directory, or an edit's old_string doesn't
+        match). This deliberately records nothing in that case rather than a
+        checkpoint entry for a change that never happened.
+        """
         if self._current is None:
             return
         key = str(target)
         if any(c.path == key for c in self._current.changes):
             return  # keep the *first* pre-turn state if the same file is touched twice
+        if target.exists() and not target.is_file():
+            return  # not a regular file (e.g. a directory) — write_file/edit_file will
+            # reject this on their own; nothing meaningful to checkpoint or undo.
         existed = target.is_file()
         before: str | None
         if existed:
@@ -127,8 +140,19 @@ class CheckpointStore:
                     if key not in self._current.skipped_large:
                         self._current.skipped_large.append(key)
                     return
-                before = target.read_text(encoding="utf-8", errors="replace")
+                raw = target.read_bytes()
             except OSError:
+                return
+            try:
+                before = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                # Not valid UTF-8: read_text(errors="replace") would silently
+                # corrupt the byte content before it's even stored, making
+                # /undo "restore" a lossy, already-mangled version. Refuse to
+                # checkpoint it instead — same honest-skip treatment as an
+                # oversized file.
+                if key not in self._current.skipped_binary:
+                    self._current.skipped_binary.append(key)
                 return
         else:
             before = None
@@ -136,10 +160,18 @@ class CheckpointStore:
 
     def commit_turn(self) -> Checkpoint | None:
         """Persist the turn's recorded changes as one checkpoint. Returns it, or
-        None if nothing was recorded (no file was mutated this turn)."""
+        None if the turn recorded nothing at all (no file was touched).
+
+        A turn that touched only skipped (oversized/binary) files still comes
+        back non-None, so the caller can tell the user those files aren't
+        covered by /undo — but nothing is written to disk for it, since there
+        is no actual undo-able state to persist or list in /checkpoints.
+        """
         cp, self._current = self._current, None
-        if cp is None or not cp.changes:
+        if cp is None or (not cp.changes and not cp.skipped_large and not cp.skipped_binary):
             return None
+        if not cp.changes:
+            return cp  # nothing to persist — just skipped-file bookkeeping to report
         self.dir.mkdir(parents=True, exist_ok=True)
         # A monotonic sequence number (not just the wall-clock timestamp) so
         # ordering stays correct even when two turns commit within the same
@@ -173,35 +205,54 @@ class CheckpointStore:
         for f in files[: max(excess, 0)]:
             f.unlink(missing_ok=True)
 
+    def count(self) -> int:
+        """Total number of checkpoints retained on disk (may exceed what list() returns)."""
+        return len(self._files())
+
     def list(self, limit: int = 10) -> list[Checkpoint]:
         """Most recent first."""
+        if limit <= 0:
+            return []
         out = []
         for f in reversed(self._files()[-limit:]):
             try:
                 out.append(Checkpoint.from_json(json.loads(f.read_text(encoding="utf-8"))))
-            except (OSError, json.JSONDecodeError, KeyError):
+            except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
                 continue
         return out
 
     def undo_last(self) -> Checkpoint | None:
-        """Pop and apply the most recent checkpoint. Returns it, or None if empty."""
+        """Pop and apply the most recent checkpoint. Returns it, or None if empty.
+
+        Best-effort per file: a problem restoring one change (permission
+        error, a path that no longer makes sense, a symlink now pointing
+        somewhere unexpected) doesn't abort the rest of the checkpoint or
+        crash the caller — every apply below and the checkpoint file itself
+        are always cleaned up.
+        """
         files = self._files()
         if not files:
             return None
         last = files[-1]
         try:
             cp = Checkpoint.from_json(json.loads(last.read_text(encoding="utf-8")))
-        except (OSError, json.JSONDecodeError, KeyError):
+        except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
             last.unlink(missing_ok=True)
             return None
         for change in cp.changes:
-            target = Path(change.path)
-            if target != self.root and self.root not in target.parents:
-                continue  # refuse to touch anything outside this checkpoint's workspace
-            if change.existed_before:
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(change.before_content or "", encoding="utf-8")
-            else:
-                target.unlink(missing_ok=True)
+            try:
+                # Re-resolve at undo time (not just the raw stored path) so a
+                # symlink introduced after the checkpoint was recorded can't
+                # smuggle the write outside the workspace.
+                target = Path(change.path).resolve()
+                if target != self.root and self.root not in target.parents:
+                    continue  # refuse to touch anything outside this checkpoint's workspace
+                if change.existed_before:
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_text(change.before_content or "", encoding="utf-8")
+                elif target.is_file():
+                    target.unlink()
+            except OSError:
+                continue  # best-effort: skip this file, still process the rest
         last.unlink(missing_ok=True)
         return cp

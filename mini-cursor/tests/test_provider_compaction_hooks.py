@@ -5,6 +5,7 @@ offline — network clients are replaced with simple fakes."""
 import os
 from types import SimpleNamespace
 
+import pytest
 from rich.console import Console
 
 from minicursor.config import (
@@ -191,7 +192,9 @@ def test_create_stream_falls_back_and_remembers_when_unsupported():
     def create(**kwargs):
         calls.append(kwargs)
         if "stream_options" in kwargs:
-            raise RuntimeError("unknown parameter: stream_options")
+            # TypeError is one of the narrow set of "the request itself was
+            # rejected" signals _create_stream treats as "unsupported param".
+            raise TypeError("unexpected keyword argument 'stream_options'")
         return iter([])
 
     backend = make_openai_backend(make_fake_openai_client(create))
@@ -205,7 +208,29 @@ def test_create_stream_falls_back_and_remembers_when_unsupported():
     # Next call shouldn't retry stream_options at all — remembered as unsupported.
     backend._create_stream([{"role": "user", "content": "hi"}], [])
     assert len(calls) == 3
-    assert "stream_options" not in calls[2]
+
+
+def test_create_stream_does_not_misclassify_unrelated_failures():
+    """An auth/rate-limit/network/server error on the stream_options probe is
+    NOT the same thing as 'this endpoint doesn't support stream_options' — it
+    must propagate immediately instead of silently and permanently disabling
+    usage tracking for an unrelated reason."""
+    calls = []
+
+    def create(**kwargs):
+        calls.append(kwargs)
+        raise ConnectionError("network blip")
+
+    backend = make_openai_backend(make_fake_openai_client(create))
+
+    with pytest.raises(ConnectionError):
+        backend._create_stream([{"role": "user", "content": "hi"}], [])
+
+    # Not misclassified as "unsupported": no silent fallback call, and the
+    # probe stays untested so a later, working call can still succeed with
+    # stream_options.
+    assert len(calls) == 1
+    assert backend._usage_supported is None
 
 
 def test_stream_turn_captures_prompt_tokens_from_usage_chunk():
@@ -238,13 +263,19 @@ def test_stream_turn_captures_prompt_tokens_from_usage_chunk():
 
 
 def test_openai_complete_text():
+    captured = {}
+
     def create(**kwargs):
+        captured.update(kwargs)
         return SimpleNamespace(
             choices=[SimpleNamespace(message=SimpleNamespace(content="a summary"))]
         )
 
     backend = make_openai_backend(make_fake_openai_client(create))
     assert backend.complete_text("sys", "old transcript") == "a summary"
+    # Capped like AnthropicBackend.complete_text so a verbose local model can't
+    # return an unbounded summary that defeats the point of compacting.
+    assert captured["max_tokens"] == 2000
 
 
 def test_openai_render_round_includes_tool_calls_and_tool_results():

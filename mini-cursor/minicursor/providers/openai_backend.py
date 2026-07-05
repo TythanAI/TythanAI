@@ -10,7 +10,10 @@ from __future__ import annotations
 import json
 import os
 
+from openai import BadRequestError, UnprocessableEntityError
+
 from ..config import LOCAL_HOSTS, ProviderConfig, default_context_window
+from ..tools import truncate
 from ..ui import UI
 from .base import Backend, BackendConfigError, ToolCall, ToolResult, TurnResult
 
@@ -66,19 +69,25 @@ class OpenAIBackend(Backend):
 
     def _create_stream(self, full_messages: list, tools: list[dict]):
         kwargs = dict(model=self.model, messages=full_messages, tools=to_openai_tools(tools), stream=True)
-        if self._usage_supported is not False:
-            try:
-                stream = self.client.chat.completions.create(
-                    **kwargs, stream_options={"include_usage": True}
-                )
-                self._usage_supported = True
-                return stream
-            except Exception:
-                # Doesn't support stream_options (or some other one-off failure at
-                # request time, before any output was produced) — fall back and
-                # remember, so we don't pay for a failed request every call.
-                self._usage_supported = False
-        return self.client.chat.completions.create(**kwargs)
+        if self._usage_supported is False:
+            return self.client.chat.completions.create(**kwargs)
+        try:
+            stream = self.client.chat.completions.create(
+                **kwargs, stream_options={"include_usage": True}
+            )
+            self._usage_supported = True
+            return stream
+        except (BadRequestError, UnprocessableEntityError, TypeError):
+            # These specifically mean "the request body/params were rejected" —
+            # the closest thing to a reliable signal that stream_options isn't
+            # recognized. Remember it and fall back so we don't pay for a
+            # failed request every call. Anything else (auth, rate limit,
+            # network, 5xx) is unrelated to stream_options support and must
+            # propagate normally instead of being silently misclassified and
+            # permanently disabling usage tracking for an unrelated, possibly
+            # transient reason.
+            self._usage_supported = False
+            return self.client.chat.completions.create(**kwargs)
 
     def stream_turn(self, messages: list, system: str, tools: list[dict], ui: UI) -> TurnResult:
         stream = self._create_stream([{"role": "system", "content": system}] + messages, tools)
@@ -147,7 +156,7 @@ class OpenAIBackend(Backend):
         for m in round_messages:
             role = m.get("role", "?")
             if role == "tool":
-                lines.append(f"tool result: {str(m.get('content', ''))[:1000]}")
+                lines.append(f"tool result: {truncate(str(m.get('content', '')), 1000)}")
                 continue
             content = m.get("content")
             if isinstance(content, str) and content:
@@ -155,13 +164,17 @@ class OpenAIBackend(Backend):
             for call in m.get("tool_calls") or []:
                 fn = call.get("function", {}) if isinstance(call, dict) else {}
                 name = fn.get("name")
-                args = str(fn.get("arguments", ""))[:500]
+                args = truncate(str(fn.get("arguments", "")), 500)
                 lines.append(f"{role} called tool {name}({args})")
         return "\n".join(lines)
 
     def complete_text(self, system: str, user_text: str) -> str:
+        # Capped like AnthropicBackend.complete_text — this is only ever used
+        # for a compaction summary, so a verbose/non-compliant model can't
+        # return an unbounded completion that defeats the point of compacting.
         response = self.client.chat.completions.create(
             model=self.model,
+            max_tokens=2000,
             messages=[{"role": "system", "content": system}, {"role": "user", "content": user_text}],
         )
         return response.choices[0].message.content or ""

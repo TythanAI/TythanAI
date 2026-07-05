@@ -13,6 +13,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
 from ..config import DEFAULT_GENERIC_CONTEXT_WINDOW
+from ..tools import truncate
 from ..ui import UI
 
 
@@ -80,7 +81,7 @@ class Backend(ABC):
             if isinstance(content, str):
                 lines.append(f"{role}: {content}")
             else:
-                lines.append(f"{role}: {json.dumps(content, default=str, ensure_ascii=False)[:2000]}")
+                lines.append(f"{role}: {truncate(json.dumps(content, default=str, ensure_ascii=False), 2000)}")
         return "\n".join(lines)
 
     def complete_text(self, system: str, user_text: str) -> str:

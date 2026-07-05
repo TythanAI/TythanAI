@@ -191,8 +191,17 @@ class Agent:
 
     def token_budget(self) -> int:
         """Tokens available for context before the reserved output budget eats
-        into the model's context window."""
-        return max(self.backend.context_window - self.config.max_tokens, MIN_TOKEN_BUDGET)
+        into the model's context window.
+
+        The output reserve is capped at half the context window: config.max_tokens
+        is a global default (64k) sized for large-context hosted models, but a
+        small local model's context_window (an 8k default for anything on
+        localhost) can't sensibly reserve more output than that — reserving the
+        full 64k out of an 8k window would leave next to nothing for actual
+        conversation and trigger compaction almost continuously.
+        """
+        reserve = min(self.config.max_tokens, self.backend.context_window // 2)
+        return max(self.backend.context_window - reserve, MIN_TOKEN_BUDGET)
 
     def context_tokens_estimate(self) -> int:
         """Best known estimate of the current history's size in tokens: the
@@ -250,11 +259,17 @@ class Agent:
 
     # -- the loop ----------------------------------------------------------
 
-    def run_turn(self, user_input: str) -> None:
-        """Process one user message to completion (may involve many tool rounds)."""
+    def run_turn(self, user_input: str, label: str | None = None) -> None:
+        """Process one user message to completion (may involve many tool rounds).
+
+        `label` is what gets recorded as this turn's checkpoint label (shown by
+        /checkpoints); it defaults to `user_input` but callers that expand
+        @mentions before calling run_turn should pass the raw, un-expanded text
+        instead so the label stays a readable summary of what the user typed.
+        """
         self.backend.add_user_message(self.messages, user_input)
         self.ui.assistant_prefix()
-        self.checkpoints.begin_turn(user_input)
+        self.checkpoints.begin_turn(label if label is not None else user_input)
         self._compaction_unavailable = False
 
         try:
@@ -285,11 +300,21 @@ class Agent:
                     results.append(ToolResult(call_id=call.id, output=output, is_error=is_error))
                 self.backend.add_tool_results(self.messages, results)
         finally:
-            checkpoint = self.checkpoints.commit_turn()
+            # A disk error here (e.g. ~/.minicursor unwritable) must never mask
+            # a real exception already propagating from the try block above —
+            # a bare `raise` from a finally clause replaces it, which would
+            # turn e.g. a network error into a confusing OSError instead.
+            try:
+                checkpoint = self.checkpoints.commit_turn()
+            except OSError as exc:
+                checkpoint = None
+                self.ui.error(f"couldn't save checkpoint ({exc}); this turn's edits won't be undoable")
             if checkpoint:
-                note = ""
-                if checkpoint.skipped_large:
-                    note = f" ({len(checkpoint.skipped_large)} large file(s) not covered)"
-                self.ui.info(
-                    f"checkpoint saved: {len(checkpoint.changes)} file(s) changed{note} — /undo to revert"
-                )
+                skipped = checkpoint.skipped_large + checkpoint.skipped_binary
+                note = f" ({len(skipped)} large/binary file(s) not covered)" if skipped else ""
+                if checkpoint.changes:
+                    self.ui.info(
+                        f"checkpoint saved: {len(checkpoint.changes)} file(s) changed{note} — /undo to revert"
+                    )
+                else:
+                    self.ui.info(f"note: {len(skipped)} large/binary file(s) changed but aren't covered by /undo")
