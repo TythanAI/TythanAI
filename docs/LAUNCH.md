@@ -115,9 +115,9 @@ Launch 12:01am PT; rally early upvotes from your network in the first hours.
 
 ---
 
-## 6. The credibility piece — turn GHOST-2025-001 into a write-up
+## 6. The credibility piece — turn TYTHANAI-2025-001 into a write-up
 
-You already have `GHOST-2025-001-public-disclosure.md`. A real, responsibly-disclosed
+You already have `TYTHANAI-2025-001-public-disclosure.md`. A real, responsibly-disclosed
 vulnerability write-up is the single most powerful credibility asset for a security
 tool. Publish it as a blog post (dev.to / Hashnode / Medium / Habr) titled around the
 impact, and end with "this is the class of bug TythanAI detects automatically." Link it

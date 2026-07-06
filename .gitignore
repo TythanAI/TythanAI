@@ -33,7 +33,7 @@ env/
 
 # Local data / reports / secrets
 *.db
-ghost_reports/
+tythanai_reports/
 *.local
 .env
 .env.*

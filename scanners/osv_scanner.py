@@ -187,7 +187,7 @@ def _osv_vuln_to_finding(
     ecosystem: str,
     source_file: str,
 ) -> Dict:
-    """Convert an OSV vulnerability object into a Ghost finding dict."""
+    """Convert an OSV vulnerability object into a TythanAI finding dict."""
     vuln_id   = osv_vuln.get("id", "OSV-UNKNOWN")
     aliases   = osv_vuln.get("aliases", [])
     # Prefer CVE ID if available
@@ -427,7 +427,7 @@ class OSVScanner:
     def _query_and_convert(
         self, deps: List[Tuple[str, str, str]], source_file: str
     ) -> List[Dict]:
-        """Query OSV for a list of deps and return Ghost findings."""
+        """Query OSV for a list of deps and return TythanAI findings."""
         if not self.is_online():
             return self._fallback_scan_file(source_file)
 

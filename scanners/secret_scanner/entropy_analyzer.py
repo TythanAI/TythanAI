@@ -137,7 +137,7 @@ class EntropyAnalyzer:
         Scan a single file for high-entropy secrets.
 
         Skips binary files, minified JS/CSS, and known-safe extensions.
-        Returns a list of finding dicts compatible with the Ghost platform schema.
+        Returns a list of finding dicts compatible with the TythanAI platform schema.
         """
         p = Path(path)
         if p.suffix.lower() in SKIP_EXTENSIONS:

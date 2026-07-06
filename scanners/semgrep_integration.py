@@ -1,7 +1,7 @@
 """
 TythanAI Platform — Semgrep Integration
-Расширяет Ghost на Java, Go, Ruby, PHP, C#, Kotlin через Semgrep.
-Нормализует вывод Semgrep в Ghost finding формат с CWE/OWASP enrichment.
+Расширяет TythanAI на Java, Go, Ruby, PHP, C#, Kotlin через Semgrep.
+Нормализует вывод Semgrep в TythanAI finding формат с CWE/OWASP enrichment.
 Graceful fallback если Semgrep не установлен.
 """
 from __future__ import annotations
@@ -50,7 +50,7 @@ _EXT_TO_LANG: Dict[str, str] = {
     ".cc":    "cpp",
 }
 
-# Semgrep severity → Ghost severity
+# Semgrep severity → TythanAI severity
 _SEV_MAP = {
     "ERROR":   "HIGH",
     "WARNING": "MEDIUM",
@@ -91,7 +91,7 @@ def _detect_languages(path: str) -> List[str]:
 
 
 def _normalize_finding(raw: dict, source_path: str) -> dict:
-    """Конвертирует Semgrep finding в Ghost finding формат."""
+    """Конвертирует Semgrep finding в TythanAI finding формат."""
     extra   = raw.get("extra", {})
     meta    = extra.get("metadata", {})
     message = extra.get("message", raw.get("check_id", "Semgrep finding"))
@@ -139,7 +139,7 @@ def _normalize_finding(raw: dict, source_path: str) -> dict:
 class SemgrepScanner:
     """
     Запускает Semgrep с автоматически выбранными рулсетами.
-    Нормализует вывод в Ghost формат.
+    Нормализует вывод в TythanAI формат.
     """
 
     def __init__(self) -> None:
@@ -158,7 +158,7 @@ class SemgrepScanner:
     ) -> dict:
         """
         Сканирует директорию всеми применимыми рулсетами.
-        Возвращает Ghost-формат results dict.
+        Возвращает TythanAI-формат results dict.
         """
         if not self._available:
             return {

@@ -2,9 +2,9 @@
 
 ## Gas Drain via Unconditional accept_message() in TON Wallet Contracts
 
-**CVE/Advisory:** GHOST-2025-001  
+**CVE/Advisory:** TYTHANAI-2025-001  
 **Severity:** HIGH (CVSS 8.1)  
-**Discovered:** 2025-01-15 via TythanAI Platform v7  
+**Discovered:** 2025-01-15 via TythanAI Platform  
 **Disclosed:** 2025-01-22 (responsible disclosure, 7-day SLA)  
 **Status:** Pattern documented — affects multiple community FunC contracts  
 **Payout Range:** $10,000–$50,000 (TON Bug Bounty / Immunefi)
@@ -32,7 +32,7 @@ In TON blockchain, the `accept_message()` function signals that the contract agr
 pay for the current message's gas consumption from its own balance. If called before
 validating the sender, any wallet on the network can trigger this consumption.
 
-### Vulnerable Pattern (Ghost Rule: TON001)
+### Vulnerable Pattern (TythanAI Rule: TON001)
 
 ```func
 ;; VULNERABLE: accept_message before any validation
@@ -69,11 +69,11 @@ validating the sender, any wallet on the network can trigger this consumption.
 
 ## TythanAI Detection
 
-TythanAI Platform v7 detected this vulnerability in **0.003 seconds** per file
+TythanAI Platform detected this vulnerability in **0.003 seconds** per file
 using TON Rule `TON001`:
 
 ```
-$ ghost scan wallet.fc --mode ton --self-check
+$ tythanai scan wallet.fc --mode ton --self-check
 
 [1] 🟠 HIGH  TON001 [CWE-284]
   Location:  wallet.fc:3
@@ -200,7 +200,7 @@ TythanAI scanned **47 open-source FunC contracts** on GitHub and found:
 | Date | Action |
 |---|---|
 | 2025-01-15 | TythanAI Platform auto-detected pattern in open-source scan |
-| 2025-01-15 | Ghost self-check confirmed: score 85/100, READY TO SEND |
+| 2025-01-15 | TythanAI self-check confirmed: score 85/100, READY TO SEND |
 | 2025-01-16 | Contacted TON Security Team (security@ton.org) |
 | 2025-01-17 | Contacted individual contract maintainers via GitHub |
 | 2025-01-22 | 7-day responsible disclosure period completed |
@@ -213,17 +213,17 @@ TythanAI scanned **47 open-source FunC contracts** on GitHub and found:
 
 ```bash
 # Scan any FunC codebase for this and 27 other TON-specific vulnerabilities:
-ghost scan ./contracts --mode ton --self-check
+tythanai scan ./contracts --mode ton --self-check
 
 # Or run the full 12-scanner MEGA scan:
-ghost mega ./contracts --chain ton
+tythanai mega ./contracts --chain ton
 
 # Generate submission-ready writeup automatically:
-ghost writeup ./contracts/wallet.fc --project "TON Wallet" --researcher "YourName"
+tythanai writeup ./contracts/wallet.fc --project "TON Wallet" --researcher "YourName"
 ```
 
 **TythanAI Platform detects this vulnerability in 0.003s per file.**  
-Ghost Rule: `TON001` | CWE-284 | OWASP A01:2021
+TythanAI Rule: `TON001` | CWE-284 | OWASP A01:2021
 
 ---
 
@@ -233,10 +233,10 @@ TythanAI Platform is an AI-native AppSec tool specialized in TON/Web3 security
 with support for 15+ languages and 12 specialized scanners.
 
 - **12 scanners:** SAST, Secrets, Dependencies, Taint, TON/FunC, Solidity/EVM,
-  Mobile (Android/iOS), Cloud/K8s, Rust, CI/CD, Supply Chain, Ghost Rules
+  Mobile (Android/iOS), Cloud/K8s, Rust, CI/CD, Supply Chain, TythanAI Rules
 - **Benchmark:** 100% Precision, 100% Recall, 0% FPR (25 test cases)
 - **Bug bounty:** TON, Immunefi, Code4rena, Sherlock, HackerOne integration
-- **One command:** `ghost mega .` — runs all 12 scanners
+- **One command:** `tythanai mega .` — runs all 12 scanners
 
 GitHub: https://github.com/tythanai/platform  
 Docs: https://docs.tythanai.io  
@@ -244,5 +244,5 @@ Contact: security@tythanai.io
 
 ---
 
-*This research was conducted and automated by TythanAI Platform v7.*  
+*This research was conducted and automated by TythanAI Platform.*  
 *Responsible disclosure followed CERT/CC guidelines.*
