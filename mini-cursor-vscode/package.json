@@ -1,0 +1,204 @@
+{
+  "name": "mini-cursor",
+  "displayName": "mini-cursor",
+  "description": "The AI coding agent that won't ship vulnerabilities — chat, agentic edits, inline tab-completion and a built-in security auditor, right inside VS Code.",
+  "version": "0.1.0",
+  "publisher": "tythanai",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TythanAI/TythanAI.git",
+    "directory": "mini-cursor-vscode"
+  },
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": ">=18"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "chat",
+    "agent",
+    "security",
+    "assistant"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mini-cursor",
+          "title": "mini-cursor",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "mini-cursor": [
+        {
+          "type": "webview",
+          "id": "miniCursor.chatView",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "miniCursor.openChat",
+        "title": "mini-cursor: Open Chat",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "miniCursor.newSession",
+        "title": "mini-cursor: New Chat Session"
+      },
+      {
+        "command": "miniCursor.undo",
+        "title": "mini-cursor: Undo Last Agent Change"
+      },
+      {
+        "command": "miniCursor.showCheckpoints",
+        "title": "mini-cursor: Show Checkpoints"
+      },
+      {
+        "command": "miniCursor.compact",
+        "title": "mini-cursor: Compact Context Now"
+      },
+      {
+        "command": "miniCursor.showContext",
+        "title": "mini-cursor: Show Context Usage"
+      },
+      {
+        "command": "miniCursor.audit",
+        "title": "mini-cursor: Run Security Audit"
+      },
+      {
+        "command": "miniCursor.toggleYolo",
+        "title": "mini-cursor: Toggle Auto-Approve (YOLO) Mode"
+      },
+      {
+        "command": "miniCursor.setApiKey",
+        "title": "mini-cursor: Set API Key for Provider"
+      },
+      {
+        "command": "miniCursor.toggleInlineCompletion",
+        "title": "mini-cursor: Toggle Inline Tab-Completion"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "miniCursor.newSession",
+          "when": "view == miniCursor.chatView",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "mini-cursor",
+      "properties": {
+        "miniCursor.provider": {
+          "type": "string",
+          "default": "anthropic",
+          "enum": [
+            "anthropic",
+            "openai",
+            "openrouter",
+            "ollama",
+            "custom"
+          ],
+          "description": "Which configured provider to use for chat/agent turns."
+        },
+        "miniCursor.model": {
+          "type": "string",
+          "default": "claude-opus-4-8",
+          "description": "Model id for the active provider."
+        },
+        "miniCursor.effort": {
+          "type": "string",
+          "default": "high",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "description": "Reasoning effort (Anthropic models only)."
+        },
+        "miniCursor.contextWindow": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
+          "description": "Override the assumed context window (tokens) for the active provider. Leave unset to use a conservative built-in default."
+        },
+        "miniCursor.maxOutputTokens": {
+          "type": "number",
+          "default": 8192,
+          "description": "Max tokens reserved for a single model response."
+        },
+        "miniCursor.customBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL for an OpenAI-compatible endpoint, used when miniCursor.provider is \"openai\", \"openrouter\", \"ollama\" or \"custom\"."
+        },
+        "miniCursor.yolo": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-approve every file write/edit/command without asking. Dangerous — off by default."
+        },
+        "miniCursor.checkpointsEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Record a pre-edit checkpoint before every agent-authored file change, so it can be undone with 'mini-cursor: Undo Last Agent Change'."
+        },
+        "miniCursor.compactKeepRounds": {
+          "type": "number",
+          "default": 2,
+          "description": "Number of most-recent conversation turns kept verbatim when the context is compacted."
+        },
+        "miniCursor.inlineCompletion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show AI inline tab-completions (ghost text) as you type."
+        },
+        "miniCursor.inlineCompletion.debounceMs": {
+          "type": "number",
+          "default": 400,
+          "description": "How long to wait after you stop typing before requesting an inline completion."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ./",
+    "build": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pretest:integration": "npm run build",
+    "test:integration": "node ./test/integration/runTests.js",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.90.0",
+    "@vscode/test-electron": "^3.0.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.1",
+    "typescript": "^6.0.0",
+    "vitest": "^4.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
+    "openai": "^6.45.0"
+  }
+}
