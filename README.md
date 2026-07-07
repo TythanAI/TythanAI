@@ -20,6 +20,8 @@ That's it. No sign-up, no API key, no data leaves your machine.
 
 ## 🆕 Tythan — the AI coding agent that won't ship vulnerabilities
 
+![tythan demo — the security gate blocks an AI-written SQL injection, the agent rewrites it safely](docs/tythan-demo.gif)
+
 The same package now includes **`tythan`**, a Cursor-style coding agent for
 your terminal. Chat with a model about your project; it edits files and runs
 commands with your confirmation — and **every AI-authored change is

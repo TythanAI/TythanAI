@@ -133,6 +133,7 @@ class Agent:
                 answered: set[str] = set()
                 try:
                     for tc in result.tool_calls:
+                        self.on_notice(format_tool_call(tc))
                         output, is_error, changed = self._execute(tc)
                         if changed:
                             stats.files_changed.append(changed)
@@ -225,6 +226,9 @@ class Agent:
         worst = security_gate.worst_severity(findings)
         if self.config.security_gate and self.config.block_critical and worst == "CRITICAL":
             report = "\n".join(f.format() for f in findings)
+            self.on_notice(
+                f"security gate BLOCKED {write.display_path} — "
+                f"{sum(1 for f in findings if f.severity == 'CRITICAL')} CRITICAL finding(s)")
             return ("BLOCKED by the security gate — this change introduces "
                     f"CRITICAL findings:\n{report}\n"
                     "Rewrite the change without these vulnerabilities."), True, None

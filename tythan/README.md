@@ -5,6 +5,13 @@ with a model about your project; it reads your code, edits files and runs
 commands — every change shown as a colorized diff you approve, and every
 change **security-scanned before it touches disk**.
 
+![tythan demo — the security gate blocks an AI-written SQL injection, the agent rewrites it safely](../docs/tythan-demo.gif)
+
+*Real session: the model tries to add an endpoint with an f-string SQL
+query — the gate blocks the write as CRITICAL, the model rewrites it with a
+parameterized query, the user approves the diff. Recording:
+[docs/tythan-demo.cast](../docs/tythan-demo.cast) (asciinema).*
+
 ```bash
 pip install tythanai-community
 export ANTHROPIC_API_KEY=sk-ant-…

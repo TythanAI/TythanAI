@@ -126,30 +126,47 @@ def main(argv: list[str] | None = None) -> int:
     else:
         approver = DenyAllApprover()
 
-    agent = Agent(config, workspace, backend, approver,
-                  on_notice=lambda s: print(ui.dim(f"· {s}")))
+    printer = _Printer()
+    agent = Agent(config, workspace, backend, approver, on_notice=printer.notice)
 
     if args.prompt is not None:
-        return _one_shot(agent, args.prompt)
+        return _one_shot(agent, printer, args.prompt)
     if not sys.stdin.isatty():
         data = sys.stdin.read().strip()
         if not data:
             print(ui.red("error: no prompt given (use -p or pipe stdin)"), file=sys.stderr)
             return 2
-        return _one_shot(agent, data)
-    return _repl(agent, config, workspace)
+        return _one_shot(agent, printer, data)
+    return _repl(agent, printer, config, workspace)
 
 
-def _stream_printer(text: str) -> None:
-    print(text, end="", flush=True)
+class _Printer:
+    """Streams model text and injects status notices on their own lines."""
+
+    def __init__(self) -> None:
+        self._midline = False
+
+    def text(self, piece: str) -> None:
+        if piece:
+            print(piece, end="", flush=True)
+            self._midline = not piece.endswith("\n")
+
+    def notice(self, message: str) -> None:
+        if self._midline:
+            print()
+            self._midline = False
+        if "BLOCKED" in message:
+            print(ui.red(f"✘ {message}"))
+        else:
+            print(ui.dim(f"· {message}"))
 
 
-def _one_shot(agent: Agent, prompt: str) -> int:
+def _one_shot(agent: Agent, printer: _Printer, prompt: str) -> int:
     if not agent.config.yolo:
         print(ui.dim("· non-interactive run without --yolo: file writes and "
                       "commands will be denied"), file=sys.stderr)
     try:
-        agent.run_user_turn(prompt, _stream_printer)
+        agent.run_user_turn(prompt, printer.text)
     except BackendError as exc:
         print(ui.red(f"\nerror: {exc}"), file=sys.stderr)
         return 1
@@ -160,7 +177,7 @@ def _one_shot(agent: Agent, prompt: str) -> int:
     return 0
 
 
-def _repl(agent: Agent, config: Config, workspace: Workspace) -> int:
+def _repl(agent: Agent, printer: _Printer, config: Config, workspace: Workspace) -> int:
     try:
         import readline  # noqa: F401 — line editing + history for input()
     except ImportError:
@@ -184,7 +201,7 @@ def _repl(agent: Agent, config: Config, workspace: Workspace) -> int:
             continue
         try:
             print()
-            stats = agent.run_user_turn(line, _stream_printer)
+            stats = agent.run_user_turn(line, printer.text)
             print()
             bits = [f"{stats.rounds} round(s)"]
             if stats.files_changed:
@@ -223,7 +240,7 @@ def _slash(agent: Agent, config: Config, line: str) -> str | None:
         print("\n".join(entries) if entries else "(no checkpoints)")
     elif cmd == "/audit":
         target = rest or "."
-        print(ui.dim(f"· scanning {target}…"))
+        print(ui.dim(f"· scanning {rest or 'workspace'}…"))
         findings = security_gate.scan_path(agent.workspace.root, target)
         if not findings:
             print(ui.green("No security findings."))
