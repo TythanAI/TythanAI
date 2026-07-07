@@ -1,0 +1,7 @@
+node_modules/
+dist/
+out/
+dist-test/
+*.vsix
+.vscode-test/
+coverage/

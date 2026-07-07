@@ -1,0 +1,251 @@
+{
+  "name": "tythan-code",
+  "displayName": "Tythan Code",
+  "description": "The AI coding agent that won't ship vulnerabilities — chat, agentic edits, inline tab-completion and a built-in security auditor, right inside VS Code.",
+  "version": "0.2.0",
+  "publisher": "tythanai",
+  "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TythanAI/TythanAI.git",
+    "directory": "tythan-code"
+  },
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": ">=18"
+  },
+  "categories": [
+    "AI",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "chat",
+    "agent",
+    "security",
+    "assistant"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "tythanCode",
+          "title": "Tythan Code",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "tythanCode": [
+        {
+          "type": "webview",
+          "id": "tythanCode.chatView",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "tythanCode.openChat",
+        "title": "Tythan Code: Open Chat",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "tythanCode.newSession",
+        "title": "Tythan Code: New Chat Session"
+      },
+      {
+        "command": "tythanCode.stop",
+        "title": "Tythan Code: Stop Generation"
+      },
+      {
+        "command": "tythanCode.editSelection",
+        "title": "Tythan Code: Edit Selection with AI"
+      },
+      {
+        "command": "tythanCode.addSelectionToChat",
+        "title": "Tythan Code: Add Selection to Chat"
+      },
+      {
+        "command": "tythanCode.selectModel",
+        "title": "Tythan Code: Select Model"
+      },
+      {
+        "command": "tythanCode.undo",
+        "title": "Tythan Code: Undo Last Agent Change"
+      },
+      {
+        "command": "tythanCode.showCheckpoints",
+        "title": "Tythan Code: Show Checkpoints"
+      },
+      {
+        "command": "tythanCode.compact",
+        "title": "Tythan Code: Compact Context Now"
+      },
+      {
+        "command": "tythanCode.showContext",
+        "title": "Tythan Code: Show Context Usage"
+      },
+      {
+        "command": "tythanCode.audit",
+        "title": "Tythan Code: Run Security Audit"
+      },
+      {
+        "command": "tythanCode.toggleYolo",
+        "title": "Tythan Code: Toggle Auto-Approve (YOLO) Mode"
+      },
+      {
+        "command": "tythanCode.setApiKey",
+        "title": "Tythan Code: Set API Key for Provider"
+      },
+      {
+        "command": "tythanCode.toggleInlineCompletion",
+        "title": "Tythan Code: Toggle Inline Tab-Completion"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "tythanCode.newSession",
+          "when": "view == tythanCode.chatView",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "tythanCode.editSelection",
+          "when": "editorTextFocus && !editorReadonly",
+          "group": "1_tythanCode@1"
+        },
+        {
+          "command": "tythanCode.addSelectionToChat",
+          "when": "editorTextFocus",
+          "group": "1_tythanCode@2"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "tythanCode.editSelection",
+        "key": "ctrl+alt+k",
+        "mac": "cmd+alt+k",
+        "when": "editorTextFocus && !editorReadonly"
+      },
+      {
+        "command": "tythanCode.addSelectionToChat",
+        "key": "ctrl+alt+l",
+        "mac": "cmd+alt+l",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "tythanCode.openChat",
+        "key": "ctrl+alt+;",
+        "mac": "cmd+alt+;"
+      }
+    ],
+    "configuration": {
+      "title": "Tythan Code",
+      "properties": {
+        "tythanCode.provider": {
+          "type": "string",
+          "default": "anthropic",
+          "enum": [
+            "anthropic",
+            "openai",
+            "openrouter",
+            "ollama",
+            "custom"
+          ],
+          "description": "Which configured provider to use for chat/agent turns."
+        },
+        "tythanCode.model": {
+          "type": "string",
+          "default": "claude-opus-4-8",
+          "description": "Model id for the active provider."
+        },
+        "tythanCode.effort": {
+          "type": "string",
+          "default": "high",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ],
+          "description": "Reasoning effort (Anthropic models only)."
+        },
+        "tythanCode.contextWindow": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "default": null,
+          "description": "Override the assumed context window (tokens) for the active provider. Leave unset to use a conservative built-in default."
+        },
+        "tythanCode.maxOutputTokens": {
+          "type": "number",
+          "default": 8192,
+          "description": "Max tokens reserved for a single model response."
+        },
+        "tythanCode.customBaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "Base URL for an OpenAI-compatible endpoint, used when tythanCode.provider is \"openai\", \"openrouter\", \"ollama\" or \"custom\"."
+        },
+        "tythanCode.yolo": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto-approve every file write/edit/command without asking. Dangerous — off by default."
+        },
+        "tythanCode.checkpointsEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Record a pre-edit checkpoint before every agent-authored file change, so it can be undone with 'Tythan Code: Undo Last Agent Change'."
+        },
+        "tythanCode.compactKeepRounds": {
+          "type": "number",
+          "default": 2,
+          "description": "Number of most-recent conversation turns kept verbatim when the context is compacted."
+        },
+        "tythanCode.inlineCompletion.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show AI inline tab-completions (ghost text) as you type."
+        },
+        "tythanCode.inlineCompletion.debounceMs": {
+          "type": "number",
+          "default": 400,
+          "description": "How long to wait after you stop typing before requesting an inline completion."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p ./",
+    "build": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pretest:integration": "npm run build",
+    "test:integration": "node ./test/integration/runTests.js",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.90.0",
+    "@vscode/test-electron": "^3.0.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.1",
+    "typescript": "^6.0.0",
+    "vitest": "^4.0.0"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.110.0",
+    "openai": "^6.45.0"
+  }
+}
