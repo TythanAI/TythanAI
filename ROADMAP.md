@@ -13,12 +13,22 @@ Priorities may shift based on user feedback.
 - GitHub Actions integration
 - SARIF 2.1.0, JSON and HTML reports
 
+## Now (Tythan coding agent)
+
+- `tythan` — terminal AI coding agent with a pre-write security gate
+  (every AI-authored change scanned before it touches disk)
+- Anthropic + any OpenAI-compatible provider (incl. local Ollama/vLLM)
+- Diff approval, per-turn undo, context compaction, `.cursorrules`/`AGENTS.md`
+
 ## Next (within 3 months)
 
 - Expanded Community Web3 rule coverage
 - Docker image published
 - Honest public benchmark on the Juliet corpus
 - More example CI integrations
+- Tythan: persistent sessions, `@codebase` retrieval, dependency-CVE gate
+  (OSV.dev) on `pip install`/`npm install` commands the agent runs
+- Tythan Code (VS Code extension) source in-repo + Marketplace publication
 
 ## Pro / Enterprise
 

@@ -19,7 +19,8 @@ python-multipart>=0.0.9
 # ── Vector memory (optional — ChromaDB for rule deduplication) ────────
 chromadb>=0.4.24
 
-# ── AI / LLM (optional — for AI auto-fix features) ───────────────────
+# ── AI / LLM ──────────────────────────────────────────────────────────
+anthropic>=0.75.0          # tythan coding agent (Anthropic provider)
 # openai>=1.30.0
 
 # ── Testing ───────────────────────────────────────────────────────────

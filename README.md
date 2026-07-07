@@ -18,6 +18,28 @@ That's it. No sign-up, no API key, no data leaves your machine.
 
 ---
 
+## 🆕 Tythan — the AI coding agent that won't ship vulnerabilities
+
+The same package now includes **`tythan`**, a Cursor-style coding agent for
+your terminal. Chat with a model about your project; it edits files and runs
+commands with your confirmation — and **every AI-authored change is
+security-scanned before it touches disk**. Hardcoded secrets, SQL built with
+f-strings, `verify=False` and friends are blocked at write time, not found
+in review a week later.
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-…   # or any OpenAI-compatible provider
+cd your-project
+tythan
+```
+
+Works with Anthropic, OpenAI, OpenRouter, and local models (Ollama / LM
+Studio / vLLM). Colorized diffs with y/n approval, `/undo` for any turn,
+`/audit` for a workspace scan, `.cursorrules`/`AGENTS.md` support, automatic
+context compaction. See **[tythan/README.md](tythan/README.md)**.
+
+---
+
 ## See it in action
 
 Point it at a folder and it tells you what's actually exploitable *(example output)*:

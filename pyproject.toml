@@ -32,6 +32,7 @@ dependencies = [
     "semgrep>=1.100.0",
     "bandit>=1.7.7",
     "python-dotenv>=1.0.0",
+    "anthropic>=0.75.0",
 ]
 
 [project.optional-dependencies]
@@ -60,6 +61,7 @@ dev = [
 [project.scripts]
 tythanai = "tythanai_community_cli:main"
 tythanai-community = "tythanai_community_cli:main"
+tythan = "tythan.cli:main"
 
 [project.urls]
 Homepage = "https://tythanai.io"
