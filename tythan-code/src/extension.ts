@@ -15,10 +15,12 @@ import { CheckpointStore, workspaceStorageKey } from "./core/checkpoints";
 import { formatFindings, scanWorkspace } from "./core/security";
 import { makeBackend } from "./core/providers";
 import type { Backend } from "./core/providers/types";
-import { SessionStore } from "./core/sessionStore";
+import { SessionLibrary, SessionStore } from "./core/sessionStore";
 import { VscodeToolApprover } from "./vscode-integration/approver";
 import { ChatViewProvider } from "./vscode-integration/chatPanel";
+import { generateCommitMessage } from "./vscode-integration/commitMessage";
 import { runComposer } from "./vscode-integration/composer";
+import { TythanCodeQuickFixProvider, fixDiagnostics } from "./vscode-integration/fixDiagnostics";
 import { TythanCodeInlineCompletionProvider } from "./vscode-integration/inlineCompletion";
 import { editSelection } from "./vscode-integration/inlineEdit";
 import {
@@ -55,6 +57,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   let agent: Agent | undefined;
   let backend: Backend | undefined;
   let completionBackend: Backend | undefined;
+  let sessionLibrary: SessionLibrary | undefined;
   let sessionStore: SessionStore | undefined;
 
   const chatView = new ChatViewProvider(
@@ -66,11 +69,59 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
 
-  chatView.onSessionChanged = () => {
+  function saveCurrentSession(): void {
     if (agent && backend && sessionStore) {
       sessionStore.save(backend.describe(), agent.messages, chatView.getTranscript());
     }
-  };
+  }
+  chatView.onSessionChanged = saveCurrentSession;
+
+  function sessionStateKey(root: string): string {
+    return `tythanCode.currentSession.${workspaceStorageKey(root)}`;
+  }
+
+  async function startNewSession(): Promise<void> {
+    const root = activeWorkspaceRoot();
+    if (root && sessionLibrary) {
+      // The finished session was saved after its last turn; just point the
+      // store at a fresh id so the old one stays in the sessions list.
+      const id = sessionLibrary.newId();
+      await context.workspaceState.update(sessionStateKey(root), id);
+      sessionStore = sessionLibrary.store(id);
+    }
+    chatView.newSession();
+  }
+
+  async function switchToSession(id: string): Promise<void> {
+    const root = activeWorkspaceRoot();
+    if (!root || !sessionLibrary || !agent || !backend) {
+      return;
+    }
+    if (chatView.isBusy) {
+      void vscode.window.showWarningMessage("Tythan Code: wait for the current turn to finish before switching");
+      return;
+    }
+    saveCurrentSession();
+    const store = sessionLibrary.store(id);
+    const session = store.loadAny();
+    if (!session) {
+      void vscode.window.showWarningMessage("Tythan Code: couldn't load that session");
+      return;
+    }
+    await context.workspaceState.update(sessionStateKey(root), id);
+    sessionStore = store;
+    agent.reset();
+    chatView.setTranscript(session.transcript);
+    if (session.providerKey === backend.describe()) {
+      agent.messages = session.messages;
+    }
+    chatView.rerender();
+    if (session.providerKey !== backend.describe()) {
+      chatView.info(
+        `session was recorded with ${session.providerKey}; the transcript is shown but the model starts without that context`,
+      );
+    }
+  }
 
   async function rebuild(): Promise<void> {
     const root = activeWorkspaceRoot();
@@ -78,6 +129,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       agent = undefined;
       backend = undefined;
       completionBackend = undefined;
+      sessionLibrary = undefined;
       sessionStore = undefined;
       return;
     }
@@ -98,14 +150,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const storageDir = path.join(context.globalStorageUri.fsPath, "checkpoints", workspaceStorageKey(root));
       const checkpointStore = new CheckpointStore(root, storageDir);
       agent = new Agent(agentConfig, chatView, new VscodeToolApprover(), backend, checkpointStore);
-      sessionStore = new SessionStore(
-        path.join(context.globalStorageUri.fsPath, "sessions", `${workspaceStorageKey(root)}.json`),
-      );
+      sessionLibrary = new SessionLibrary(path.join(context.globalStorageUri.fsPath, "sessions", workspaceStorageKey(root)));
+      let currentId = context.workspaceState.get<string>(sessionStateKey(root));
+      if (!currentId) {
+        currentId = sessionLibrary.newId();
+        await context.workspaceState.update(sessionStateKey(root), currentId);
+      }
+      sessionStore = sessionLibrary.store(currentId);
     } catch (err) {
       void vscode.window.showErrorMessage(`Tythan Code: ${(err as Error).message}`);
       agent = undefined;
       backend = undefined;
       completionBackend = undefined;
+      sessionLibrary = undefined;
       sessionStore = undefined;
     }
     chatView.refreshBanner();
@@ -138,9 +195,67 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       await vscode.commands.executeCommand("tythanCode.chatView.focus");
     }),
 
-    vscode.commands.registerCommand("tythanCode.newSession", () => {
-      chatView.newSession();
+    vscode.commands.registerCommand("tythanCode.newSession", async () => {
+      await startNewSession();
     }),
+
+    vscode.commands.registerCommand("tythanCode.chatSessions", async () => {
+      if (!sessionLibrary || !backend) {
+        void vscode.window.showInformationMessage("Tythan Code: open a folder first");
+        return;
+      }
+      const sessions = sessionLibrary.list();
+      type Item = vscode.QuickPickItem & { id?: string; action?: "new" | "delete" };
+      const items: Item[] = [{ label: "$(add) New chat session", action: "new" }];
+      for (const s of sessions) {
+        items.push({
+          label: s.title,
+          description: `${new Date(s.savedAt * 1000).toLocaleString()} · ${s.providerKey}`,
+          id: s.id,
+        });
+      }
+      if (sessions.length > 0) {
+        items.push({ label: "$(trash) Delete sessions…", action: "delete" });
+      }
+      const picked = await vscode.window.showQuickPick(items, { title: "Tythan Code: chat sessions" });
+      if (!picked) {
+        return;
+      }
+      if (picked.action === "new") {
+        await startNewSession();
+        return;
+      }
+      if (picked.action === "delete") {
+        const toDelete = await vscode.window.showQuickPick(
+          sessions.map((s) => ({ label: s.title, description: new Date(s.savedAt * 1000).toLocaleString(), id: s.id })),
+          { title: "Tythan Code: delete which sessions?", canPickMany: true },
+        );
+        for (const d of toDelete ?? []) {
+          sessionLibrary.delete(d.id);
+        }
+        return;
+      }
+      if (picked.id) {
+        await switchToSession(picked.id);
+      }
+    }),
+
+    vscode.commands.registerCommand(
+      "tythanCode.fixDiagnostics",
+      async (uri?: vscode.Uri, diagnostics?: vscode.Diagnostic[]) => {
+        await fixDiagnostics(chatView, uri, diagnostics);
+      },
+    ),
+
+    vscode.commands.registerCommand("tythanCode.generateCommitMessage", async () => {
+      await generateCommitMessage(() => backend);
+    }),
+
+    vscode.languages.registerCodeActionsProvider(
+      { pattern: "**" },
+      new TythanCodeQuickFixProvider(),
+      TythanCodeQuickFixProvider.metadata,
+    ),
 
     vscode.commands.registerCommand("tythanCode.stop", () => {
       chatView.stopGeneration();

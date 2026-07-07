@@ -158,60 +158,67 @@ export async function runComposer(deps: ComposerDeps): Promise<void> {
   }
 }
 
-/** Walk the user through each staged file's diff. Returns the accepted
- * subset, or undefined if the review was cancelled outright. */
-async function reviewChanges(changes: StagedChange[]): Promise<StagedChange[] | undefined> {
-  const approver = new VscodeToolApprover();
-  const accepted: StagedChange[] = [];
-  let applyAll = false;
-  for (let i = 0; i < changes.length; i++) {
-    const change = changes[i] as StagedChange;
-    if (applyAll) {
-      accepted.push(change);
-      continue;
-    }
-    const decision = await reviewOne(change, i + 1, changes.length, approver);
-    if (decision === "cancel") {
-      return undefined;
-    }
-    if (decision === "applyAll") {
-      applyAll = true;
-      accepted.push(change);
-      continue;
-    }
-    if (decision === "apply") {
-      accepted.push(change);
-    }
-  }
-  return accepted;
+function lineCount(text: string): number {
+  return text.length === 0 ? 0 : text.split("\n").length;
 }
 
-type ReviewDecision = "apply" | "skip" | "applyAll" | "cancel";
+function describeChange(change: StagedChange): string {
+  if (change.before === undefined) {
+    return `new file · ${lineCount(change.after)} lines`;
+  }
+  return `modified · ${lineCount(change.before)} → ${lineCount(change.after)} lines`;
+}
 
-async function reviewOne(
-  change: StagedChange,
-  index: number,
-  total: number,
-  approver: VscodeToolApprover,
-): Promise<ReviewDecision> {
-  await approver.showDiffPreview({ path: change.relPath, before: change.before ?? "", after: change.after });
-  const isNew = change.before === undefined ? " (new file)" : "";
-  const choice = await vscode.window.showInformationMessage(
-    `Composer change ${index}/${total}: ${change.relPath}${isNew}. Apply it?`,
-    { modal: true },
-    "Apply",
-    "Skip",
-    "Apply All Remaining",
-  );
-  await approver.closePreview(change.relPath);
-  if (choice === "Apply") {
-    return "apply";
+interface ReviewItem extends vscode.QuickPickItem {
+  change: StagedChange;
+}
+
+/** One checkbox list for the whole changeset: every file starts checked,
+ * moving the highlight previews that file's diff beside the picker, Enter
+ * applies exactly the checked files, Esc applies nothing. */
+async function reviewChanges(changes: StagedChange[]): Promise<StagedChange[] | undefined> {
+  const approver = new VscodeToolApprover();
+  const picker = vscode.window.createQuickPick<ReviewItem>();
+  picker.title = `Composer: review ${changes.length} staged file(s) — Enter applies checked, Esc cancels`;
+  picker.placeholder = "Uncheck files to skip; highlight a file to preview its diff";
+  picker.canSelectMany = true;
+  picker.ignoreFocusOut = true;
+  picker.items = changes.map((change) => ({
+    label: change.relPath,
+    description: describeChange(change),
+    change,
+  }));
+  picker.selectedItems = picker.items; // everything accepted by default
+
+  let previewed: string | undefined;
+  picker.onDidChangeActive(async (active) => {
+    const item = active[0];
+    if (!item || item.change.relPath === previewed) {
+      return;
+    }
+    previewed = item.change.relPath;
+    // preserveFocus keeps the picker focused while the diff renders behind it.
+    await approver.showDiffPreview(
+      { path: item.change.relPath, before: item.change.before ?? "", after: item.change.after },
+      { preserveFocus: true },
+    );
+  });
+
+  const accepted = await new Promise<StagedChange[] | undefined>((resolve) => {
+    picker.onDidAccept(() => {
+      const picked = picker.selectedItems.map((i) => i.change);
+      resolve(picked); // before hide(): onDidHide also resolves (undefined) and first wins
+      picker.hide();
+    });
+    picker.onDidHide(() => {
+      picker.dispose();
+      resolve(undefined);
+    });
+    picker.show();
+  });
+
+  if (previewed !== undefined) {
+    await approver.closePreview(previewed);
   }
-  if (choice === "Skip") {
-    return "skip";
-  }
-  if (choice === "Apply All Remaining") {
-    return "applyAll";
-  }
-  return "cancel"; // Esc / dialog dismissed
+  return accepted;
 }

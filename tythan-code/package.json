@@ -2,7 +2,7 @@
   "name": "tythan-code",
   "displayName": "Tythan Code",
   "description": "The AI coding agent that won't ship vulnerabilities — chat, agentic edits, inline tab-completion and a built-in security auditor, right inside VS Code.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "tythanai",
   "private": true,
   "license": "MIT",
@@ -57,6 +57,19 @@
       {
         "command": "tythanCode.newSession",
         "title": "Tythan Code: New Chat Session"
+      },
+      {
+        "command": "tythanCode.chatSessions",
+        "title": "Tythan Code: Chat Sessions…"
+      },
+      {
+        "command": "tythanCode.fixDiagnostics",
+        "title": "Tythan Code: Fix Problems in Current File (AI)"
+      },
+      {
+        "command": "tythanCode.generateCommitMessage",
+        "title": "Tythan Code: Generate Commit Message",
+        "icon": "$(sparkle)"
       },
       {
         "command": "tythanCode.stop",
@@ -129,6 +142,18 @@
           "command": "tythanCode.addSelectionToChat",
           "when": "editorTextFocus",
           "group": "1_tythanCode@2"
+        },
+        {
+          "command": "tythanCode.fixDiagnostics",
+          "when": "editorTextFocus",
+          "group": "1_tythanCode@3"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "tythanCode.generateCommitMessage",
+          "when": "scmProvider == git",
+          "group": "navigation"
         }
       ]
     },
@@ -149,6 +174,12 @@
         "command": "tythanCode.composer",
         "key": "ctrl+alt+i",
         "mac": "cmd+alt+i"
+      },
+      {
+        "command": "tythanCode.fixDiagnostics",
+        "key": "ctrl+alt+.",
+        "mac": "cmd+alt+.",
+        "when": "editorTextFocus"
       },
       {
         "command": "tythanCode.openChat",

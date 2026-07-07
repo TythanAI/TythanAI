@@ -36,11 +36,23 @@ extensions, not forks.)
 - **Composer (`Ctrl+Alt+I` / `Cmd+Alt+I`)** — Cursor's multi-file editing
   mode. Describe one task; the agent plans and edits as many files as
   needed, but every change is *staged* in memory (the agent can read its own
-  staged edits back), nothing touches disk. At the end you review each
-  file's diff — Apply / Skip / Apply All — and everything applied is
-  recorded as one checkpoint, so a single Undo reverts the whole run.
-  `run_command` is disabled in this mode on purpose: staged changes aren't
-  on disk, so running tests would exercise the old code.
+  staged edits back), nothing touches disk. At the end you get one checkbox
+  list of every changed file — highlighting a file previews its diff, you
+  uncheck what to skip, Enter applies the rest — recorded as one checkpoint,
+  so a single Undo reverts the whole run. `run_command` is disabled in this
+  mode on purpose: staged changes aren't on disk, so running tests would
+  exercise the old code.
+- **Fix problems with AI** — `Ctrl+Alt+.` sends the current file's
+  errors/warnings (from whatever linters/language servers you run) to the
+  agent, which fixes them through the normal confirmed-diff flow. Also a
+  Quick Fix lightbulb ("Fix with Tythan Code") on any squiggle.
+- **Chat sessions** — every conversation is kept per workspace;
+  `Tythan Code: Chat Sessions…` switches between them (titles from your
+  first message), New Chat Session starts a fresh one without losing the
+  old, and sessions survive restarting VS Code.
+- **Generate commit message** — the ✨ button in Source Control (or the
+  command) reads the staged diff and writes a conventional-commits message
+  straight into the commit box.
 - **@codebase context** — mention `@codebase` in a chat message and Tythan
   Code retrieves the most relevant code chunks for your question (offline
   TF-IDF over identifier-aware tokens — `getUserProfile` matches "user
@@ -48,8 +60,9 @@ extensions, not forks.)
   index build step, and no code leaves your machine for indexing.
 - **Persistent chat history** — the conversation (model history and rendered
   transcript) survives closing the sidebar *and* restarting VS Code, per
-  workspace. Restored only when the provider+model still match; "New Chat
-  Session" clears it.
+  workspace. The model-side history is only reattached when the
+  provider+model still match; otherwise the transcript is shown and the
+  model starts fresh.
 - **Project rules files** — put instructions in `.tythanrules`,
   `.cursorrules` (existing Cursor projects keep working unchanged) or
   `AGENTS.md` at the workspace root and they're appended to the system
@@ -104,8 +117,8 @@ extensions, not forks.)
 cd tythan-code
 npm install
 npm run build            # bundles src/extension.ts -> dist/extension.js
-npm run package          # -> tythan-code-0.3.0.vsix
-code --install-extension tythan-code-0.3.0.vsix
+npm run package          # -> tythan-code-0.4.0.vsix
+code --install-extension tythan-code-0.4.0.vsix
 ```
 
 Or press `F5` in VS Code with this folder open to launch an Extension
@@ -144,11 +157,14 @@ you've raised it.
 All available from the Command Palette (`Cmd/Ctrl+Shift+P`):
 
 - **Tythan Code: Open Chat** (`Ctrl+Alt+;` / `Cmd+Alt+;`)
-- **Tythan Code: New Chat Session** — clears the conversation
+- **Tythan Code: New Chat Session** — starts a fresh conversation (the old one stays in Chat Sessions)
+- **Tythan Code: Chat Sessions…** — switch between / delete saved conversations
 - **Tythan Code: Stop Generation** — also a Stop button in the chat itself
 - **Tythan Code: Composer (Multi-File Edit)** (`Ctrl+Alt+I` / `Cmd+Alt+I`)
 - **Tythan Code: Edit Selection with AI** (`Ctrl+Alt+K` / `Cmd+Alt+K`)
 - **Tythan Code: Add Selection to Chat** (`Ctrl+Alt+L` / `Cmd+Alt+L`)
+- **Tythan Code: Fix Problems in Current File (AI)** (`Ctrl+Alt+.` / `Cmd+Alt+.`)
+- **Tythan Code: Generate Commit Message** — also the ✨ button in Source Control
 - **Tythan Code: Select Model**
 - **Tythan Code: Undo Last Agent Change**
 - **Tythan Code: Show Checkpoints**
@@ -187,7 +203,7 @@ Said plainly, because it matters more than it would in a marketing page:
   - `npm run build` (esbuild) bundles `dist/extension.js` cleanly.
   - `npm run package` (`vsce package`) produces a real, installable
     `.vsix` with no manifest warnings.
-  - 183 unit tests pass (see [Testing](#testing)) covering every module
+  - 191 unit tests pass (see [Testing](#testing)) covering every module
     under `core/` — the entire agent loop, both provider backends, tool
     execution and workspace confinement, checkpoints/undo, context
     compaction, and the security scanner.
@@ -214,7 +230,7 @@ npm run watch        # esbuild --watch, for iterating with F5
 
 ## Testing
 
-`npm test` runs 183 tests across 12 files, all offline (SDK clients are
+`npm test` runs 191 tests across 12 files, all offline (SDK clients are
 replaced with fakes matching the real `@anthropic-ai/sdk` / `openai` request
 shapes — verified against the installed packages' type definitions, not
 guessed):

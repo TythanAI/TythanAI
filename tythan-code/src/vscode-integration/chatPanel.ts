@@ -129,6 +129,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, AgentSink {
   /** Restore a persisted transcript (rendered on the next webview "ready"). */
   setTranscript(entries: TranscriptEntry[]): void {
     this.transcript = [...entries];
+    this.pendingAssistant = null;
+  }
+
+  /** Redraw the webview from the current transcript — used after switching
+   * chat sessions. No-op until the webview reports ready (it replays then). */
+  rerender(): void {
+    if (this.ready) {
+      this.post({ type: "cleared" });
+      this.replayTranscript();
+    }
   }
 
   getTranscript(): TranscriptEntry[] {
@@ -140,6 +150,22 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, AgentSink {
   setBusy(value: boolean): void {
     this.busyNow = value;
     this.post({ type: "busy", value });
+  }
+
+  get isBusy(): boolean {
+    return this.busyNow;
+  }
+
+  /** Send a message into the chat as if the user typed it (renders in the
+   * webview, runs a full agent turn). Returns false when a turn is already
+   * running. Used by "Fix Problems in Current File". */
+  sendUserMessage(text: string): boolean {
+    if (this.busyNow || !text.trim()) {
+      return false;
+    }
+    this.post({ type: "user", text });
+    void this.handleUserMessage(text);
+    return true;
   }
 
   /** Re-send the banner (workspace / backend / yolo) — call after anything

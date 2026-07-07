@@ -41,8 +41,8 @@ function diffTitle(relPath: string): string {
 
 export class VscodeToolApprover implements ToolApprover {
   /** Open the before/after diff without asking anything — flows that run
-   * their own accept/skip dialog (composer review) build on this. */
-  async showDiffPreview(preview: DiffPreview): Promise<void> {
+   * their own accept/skip UI (composer review) build on this. */
+  async showDiffPreview(preview: DiffPreview, options?: { preserveFocus?: boolean }): Promise<void> {
     const language = languageForPath(preview.path);
     const [beforeDoc, afterDoc] = await Promise.all([
       vscode.workspace.openTextDocument({ content: preview.before, language }),
@@ -50,6 +50,7 @@ export class VscodeToolApprover implements ToolApprover {
     ]);
     await vscode.commands.executeCommand("vscode.diff", beforeDoc.uri, afterDoc.uri, diffTitle(preview.path), {
       preview: true,
+      preserveFocus: options?.preserveFocus ?? false,
     });
   }
 

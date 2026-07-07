@@ -11,3 +11,5 @@ vitest.config.ts
 **/.git*
 **/node_modules/**
 !dist/**
+demo/**
+docs/**

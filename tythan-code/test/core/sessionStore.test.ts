@@ -3,7 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { MAX_TRANSCRIPT_ENTRIES, SessionStore } from "../../src/core/sessionStore";
+import { MAX_SESSIONS, MAX_TRANSCRIPT_ENTRIES, SessionLibrary, SessionStore, titleFromTranscript } from "../../src/core/sessionStore";
 import type { TranscriptEntry } from "../../src/core/sessionStore";
 
 let tmpDir: string;
@@ -94,5 +94,82 @@ describe("SessionStore", () => {
     store.clear();
     expect(fs.existsSync(store.file)).toBe(false);
     expect(() => store.clear()).not.toThrow();
+  });
+
+  it("does not persist an empty session (and clears any previous file)", () => {
+    store.save("k", [], transcript);
+    expect(fs.existsSync(store.file)).toBe(true);
+    store.save("k", [], []);
+    expect(fs.existsSync(store.file)).toBe(false);
+  });
+
+  it("loadAny() returns the session regardless of provider, with its title", () => {
+    store.save("anthropic / claude-x", [{ role: "user", content: "hi" }], transcript);
+    const loaded = store.loadAny();
+    expect(loaded?.providerKey).toBe("anthropic / claude-x");
+    expect(loaded?.title).toBe("hello");
+  });
+});
+
+describe("titleFromTranscript", () => {
+  it("uses the first user message, whitespace-collapsed and capped", () => {
+    expect(titleFromTranscript([{ kind: "info", text: "x" }, { kind: "user", text: "  fix\n the   bug  " }])).toBe(
+      "fix the bug",
+    );
+    expect(titleFromTranscript([{ kind: "user", text: "y".repeat(100) }])).toHaveLength(60);
+  });
+
+  it("falls back for transcripts with no user message", () => {
+    expect(titleFromTranscript([])).toBe("(empty session)");
+  });
+});
+
+describe("SessionLibrary", () => {
+  it("lists sessions most recently saved first and loads them by id", () => {
+    const library = new SessionLibrary(path.join(tmpDir, "lib"));
+    const a = library.newId();
+    const b = library.newId();
+    library.store(a).save("k", [{ role: "user", content: "hi" }], [{ kind: "user", text: "first session" }]);
+    library.store(b).save("k", [{ role: "user", content: "hi" }], [{ kind: "user", text: "second session" }]);
+    // force distinct savedAt ordering
+    const fileA = library.store(a).file;
+    const olderPayload = JSON.parse(fs.readFileSync(fileA, "utf-8"));
+    olderPayload.savedAt = olderPayload.savedAt - 100;
+    fs.writeFileSync(fileA, JSON.stringify(olderPayload));
+
+    const sessions = library.list();
+    expect(sessions.map((s) => s.title)).toEqual(["second session", "first session"]);
+    expect(library.store(sessions[0]!.id).loadAny()?.transcript[0]?.text).toBe("second session");
+  });
+
+  it("delete removes a session; corrupt files are skipped in list()", () => {
+    const library = new SessionLibrary(path.join(tmpDir, "lib2"));
+    const id = library.newId();
+    library.store(id).save("k", [{ role: "user", content: "hi" }], [{ kind: "user", text: "bye" }]);
+    fs.writeFileSync(path.join(tmpDir, "lib2", "corrupt.json"), "{nope");
+    expect(library.list()).toHaveLength(1);
+    library.delete(id);
+    expect(library.list()).toHaveLength(0);
+  });
+
+  it("prunes beyond MAX_SESSIONS keeping the newest", () => {
+    const library = new SessionLibrary(path.join(tmpDir, "lib3"));
+    for (let i = 0; i < MAX_SESSIONS + 5; i++) {
+      const id = library.newId();
+      library.store(id).save("k", [{ role: "user", content: "hi" }], [{ kind: "user", text: `session ${i}` }]);
+      // distinct savedAt per file
+      const file = library.store(id).file;
+      const payload = JSON.parse(fs.readFileSync(file, "utf-8"));
+      payload.savedAt = i;
+      fs.writeFileSync(file, JSON.stringify(payload));
+    }
+    const sessions = library.list();
+    expect(sessions).toHaveLength(MAX_SESSIONS);
+    expect(sessions[0]?.title).toBe(`session ${MAX_SESSIONS + 4}`);
+    expect(fs.readdirSync(path.join(tmpDir, "lib3")).filter((f) => f.endsWith(".json"))).toHaveLength(MAX_SESSIONS);
+  });
+
+  it("returns [] for a directory that doesn't exist yet", () => {
+    expect(new SessionLibrary(path.join(tmpDir, "missing")).list()).toEqual([]);
   });
 });
