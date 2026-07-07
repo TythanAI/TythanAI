@@ -17,7 +17,7 @@ import { makeBackend } from "./core/providers";
 import type { Backend } from "./core/providers/types";
 import { VscodeToolApprover } from "./vscode-integration/approver";
 import { ChatViewProvider } from "./vscode-integration/chatPanel";
-import { MiniCursorInlineCompletionProvider } from "./vscode-integration/inlineCompletion";
+import { TythanCodeInlineCompletionProvider } from "./vscode-integration/inlineCompletion";
 import {
   currentProviderName,
   resolveAgentConfig,
@@ -27,12 +27,12 @@ import {
 } from "./vscode-integration/settings";
 
 const CONFIG_KEYS_TRIGGERING_REBUILD = [
-  "miniCursor.provider",
-  "miniCursor.model",
-  "miniCursor.effort",
-  "miniCursor.contextWindow",
-  "miniCursor.customBaseUrl",
-  "miniCursor.maxOutputTokens",
+  "tythanCode.provider",
+  "tythanCode.model",
+  "tythanCode.effort",
+  "tythanCode.contextWindow",
+  "tythanCode.customBaseUrl",
+  "tythanCode.maxOutputTokens",
 ];
 
 function activeWorkspaceRoot(): string | undefined {
@@ -41,7 +41,7 @@ function activeWorkspaceRoot(): string | undefined {
 
 function requireAgent(agent: Agent | undefined): Agent {
   if (!agent) {
-    throw new Error("mini-cursor: open a folder first");
+    throw new Error("Tythan Code: open a folder first");
   }
   return agent;
 }
@@ -78,7 +78,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const checkpointStore = new CheckpointStore(root, storageDir);
       agent = new Agent(agentConfig, chatView, new VscodeToolApprover(), backend, checkpointStore);
     } catch (err) {
-      void vscode.window.showErrorMessage(`mini-cursor: ${(err as Error).message}`);
+      void vscode.window.showErrorMessage(`Tythan Code: ${(err as Error).message}`);
       agent = undefined;
       backend = undefined;
     }
@@ -97,77 +97,77 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
     }),
 
-    vscode.commands.registerCommand("miniCursor.openChat", async () => {
-      await vscode.commands.executeCommand("miniCursor.chatView.focus");
+    vscode.commands.registerCommand("tythanCode.openChat", async () => {
+      await vscode.commands.executeCommand("tythanCode.chatView.focus");
     }),
 
-    vscode.commands.registerCommand("miniCursor.newSession", () => {
+    vscode.commands.registerCommand("tythanCode.newSession", () => {
       chatView.newSession();
     }),
 
-    vscode.commands.registerCommand("miniCursor.undo", async () => {
+    vscode.commands.registerCommand("tythanCode.undo", async () => {
       try {
         const a = requireAgent(agent);
         const checkpoint = a.checkpoints.undoLast();
         if (!checkpoint) {
-          void vscode.window.showInformationMessage("mini-cursor: nothing to undo");
+          void vscode.window.showInformationMessage("Tythan Code: nothing to undo");
           return;
         }
         const skipped = checkpoint.skippedLarge.length + checkpoint.skippedBinary.length;
         const note = skipped > 0 ? ` (${skipped} large/binary file(s) weren't covered)` : "";
         void vscode.window.showInformationMessage(
-          `mini-cursor: reverted ${checkpoint.changes.length} file(s) from "${checkpoint.label}"${note}`,
+          `Tythan Code: reverted ${checkpoint.changes.length} file(s) from "${checkpoint.label}"${note}`,
         );
       } catch (err) {
-        void vscode.window.showErrorMessage(`mini-cursor: ${(err as Error).message}`);
+        void vscode.window.showErrorMessage(`Tythan Code: ${(err as Error).message}`);
       }
     }),
 
-    vscode.commands.registerCommand("miniCursor.showCheckpoints", async () => {
+    vscode.commands.registerCommand("tythanCode.showCheckpoints", async () => {
       try {
         const a = requireAgent(agent);
         const checkpoints = a.checkpoints.list();
         if (checkpoints.length === 0) {
-          void vscode.window.showInformationMessage("mini-cursor: no checkpoints yet");
+          void vscode.window.showInformationMessage("Tythan Code: no checkpoints yet");
           return;
         }
         const items = checkpoints.map((cp) => ({
           label: cp.label || "(no description)",
           description: `${cp.changes.length} file(s) — ${new Date(cp.createdAt * 1000).toLocaleTimeString()}`,
         }));
-        await vscode.window.showQuickPick(items, { title: "mini-cursor checkpoints (most recent first)" });
+        await vscode.window.showQuickPick(items, { title: "Tythan Code checkpoints (most recent first)" });
       } catch (err) {
-        void vscode.window.showErrorMessage(`mini-cursor: ${(err as Error).message}`);
+        void vscode.window.showErrorMessage(`Tythan Code: ${(err as Error).message}`);
       }
     }),
 
-    vscode.commands.registerCommand("miniCursor.compact", async () => {
+    vscode.commands.registerCommand("tythanCode.compact", async () => {
       try {
         const a = requireAgent(agent);
         const compacted = await a.maybeCompact(true);
         if (!compacted) {
-          void vscode.window.showInformationMessage("mini-cursor: nothing worth compacting yet");
+          void vscode.window.showInformationMessage("Tythan Code: nothing worth compacting yet");
         }
       } catch (err) {
-        void vscode.window.showErrorMessage(`mini-cursor: ${(err as Error).message}`);
+        void vscode.window.showErrorMessage(`Tythan Code: ${(err as Error).message}`);
       }
     }),
 
-    vscode.commands.registerCommand("miniCursor.showContext", () => {
+    vscode.commands.registerCommand("tythanCode.showContext", () => {
       try {
         const a = requireAgent(agent);
         const used = a.contextTokensEstimate();
         const budget = a.tokenBudget();
         const pct = budget ? Math.round((100 * used) / budget) : 0;
         void vscode.window.showInformationMessage(
-          `mini-cursor context: ~${used} / ${budget} tokens in use (${pct}%) — window ${a.backend.contextWindow}`,
+          `Tythan Code context: ~${used} / ${budget} tokens in use (${pct}%) — window ${a.backend.contextWindow}`,
         );
       } catch (err) {
-        void vscode.window.showErrorMessage(`mini-cursor: ${(err as Error).message}`);
+        void vscode.window.showErrorMessage(`Tythan Code: ${(err as Error).message}`);
       }
     }),
 
-    vscode.commands.registerCommand("miniCursor.audit", async () => {
+    vscode.commands.registerCommand("tythanCode.audit", async () => {
       try {
         const a = requireAgent(agent);
         const findings = scanWorkspace(a.workspace);
@@ -175,28 +175,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         const doc = await vscode.workspace.openTextDocument({ content: report, language: "plaintext" });
         await vscode.window.showTextDocument(doc, { preview: true });
       } catch (err) {
-        void vscode.window.showErrorMessage(`mini-cursor: ${(err as Error).message}`);
+        void vscode.window.showErrorMessage(`Tythan Code: ${(err as Error).message}`);
       }
     }),
 
-    vscode.commands.registerCommand("miniCursor.toggleYolo", () => {
+    vscode.commands.registerCommand("tythanCode.toggleYolo", () => {
       try {
         const a = requireAgent(agent);
         a.yolo = !a.yolo;
         void vscode.window.showInformationMessage(
           a.yolo
-            ? "mini-cursor: auto-approve (yolo) ON — writes/edits/commands run without confirmation"
-            : "mini-cursor: confirmations back on",
+            ? "Tythan Code: auto-approve (yolo) ON — writes/edits/commands run without confirmation"
+            : "Tythan Code: confirmations back on",
         );
       } catch (err) {
-        void vscode.window.showErrorMessage(`mini-cursor: ${(err as Error).message}`);
+        void vscode.window.showErrorMessage(`Tythan Code: ${(err as Error).message}`);
       }
     }),
 
-    vscode.commands.registerCommand("miniCursor.setApiKey", async () => {
+    vscode.commands.registerCommand("tythanCode.setApiKey", async () => {
       const provider = currentProviderName();
       const key = await vscode.window.showInputBox({
-        title: `mini-cursor: API key for "${provider}"`,
+        title: `Tythan Code: API key for "${provider}"`,
         password: true,
         ignoreFocusOut: true,
         placeHolder: "sk-...",
@@ -206,19 +206,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       }
       await setApiKeyForProvider(context, provider, key);
       await rebuild();
-      void vscode.window.showInformationMessage(`mini-cursor: API key saved for "${provider}"`);
+      void vscode.window.showInformationMessage(`Tythan Code: API key saved for "${provider}"`);
     }),
 
-    vscode.commands.registerCommand("miniCursor.toggleInlineCompletion", async () => {
-      const cfg = vscode.workspace.getConfiguration("miniCursor");
+    vscode.commands.registerCommand("tythanCode.toggleInlineCompletion", async () => {
+      const cfg = vscode.workspace.getConfiguration("tythanCode");
       const current = cfg.get<boolean>("inlineCompletion.enabled", true);
       await cfg.update("inlineCompletion.enabled", !current, vscode.ConfigurationTarget.Global);
-      void vscode.window.showInformationMessage(`mini-cursor: inline completion ${!current ? "enabled" : "disabled"}`);
+      void vscode.window.showInformationMessage(`Tythan Code: inline completion ${!current ? "enabled" : "disabled"}`);
     }),
 
     vscode.languages.registerInlineCompletionItemProvider(
       { pattern: "**" },
-      new MiniCursorInlineCompletionProvider(() => backend),
+      new TythanCodeInlineCompletionProvider(() => backend),
     ),
   );
 }

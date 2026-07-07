@@ -11,7 +11,7 @@ let storageDir: string;
 let store: CheckpointStore;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mini-cursor-cp-"));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tythan-code-cp-"));
   workspace = path.join(tmpDir, "workspace");
   fs.mkdirSync(workspace);
   storageDir = path.join(tmpDir, "checkpoint_storage");

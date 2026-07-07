@@ -30,7 +30,7 @@ export async function runTurnSafely(agent: Agent, sink: AgentSink, text: string)
     await agent.runTurn(expanded, text);
   } catch (err) {
     if (err instanceof AnthropicAuthenticationError || err instanceof OpenAIAuthenticationError) {
-      sink.error('authentication failed — set your API key via "mini-cursor: Set API Key for Provider" and retry');
+      sink.error('authentication failed — set your API key via "Tythan Code: Set API Key for Provider" and retry');
     } else if (err instanceof AnthropicRateLimitError || err instanceof OpenAIRateLimitError) {
       sink.error("rate limited — wait a moment and try again");
     } else if (err instanceof AnthropicAPIConnectionError || err instanceof OpenAIAPIConnectionError) {

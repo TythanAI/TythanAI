@@ -46,11 +46,11 @@ export class VscodeToolApprover implements ToolApprover {
       "vscode.diff",
       beforeDoc.uri,
       afterDoc.uri,
-      `mini-cursor: ${preview.path} (proposed change)`,
+      `Tythan Code: ${preview.path} (proposed change)`,
       { preview: true },
     );
     const choice = await vscode.window.showInformationMessage(
-      `mini-cursor wants to write to ${preview.path}. Apply this change?`,
+      `Tythan Code wants to write to ${preview.path}. Apply this change?`,
       { modal: true },
       "Apply",
     );
@@ -59,7 +59,7 @@ export class VscodeToolApprover implements ToolApprover {
 
   async confirmCommand(command: string): Promise<boolean> {
     const choice = await vscode.window.showWarningMessage(
-      `mini-cursor wants to run this command in your workspace:\n\n${command}`,
+      `Tythan Code wants to run this command in your workspace:\n\n${command}`,
       { modal: true },
       "Run",
     );

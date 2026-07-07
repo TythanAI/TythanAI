@@ -69,7 +69,7 @@ export function realpathAsFarAsPossible(target: string): string {
 }
 
 /** Converts a simple glob pattern (`**`, `*`, literal segments — the subset
- * mini-cursor's tools ever pass) into a RegExp matched against a
+ * Tythan Code's tools ever pass) into a RegExp matched against a
  * forward-slash-joined relative path. */
 export function globToRegExp(pattern: string): RegExp {
   const normalized = pattern.split(path.sep).join("/");

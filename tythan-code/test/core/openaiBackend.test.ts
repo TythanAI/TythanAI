@@ -33,7 +33,7 @@ function makeBackend(client: OpenAI, overrides: Partial<ProviderConfig> = {}) {
 }
 
 describe("toOpenAiTools", () => {
-  it("converts mini-cursor tool defs to OpenAI function-tool shape", () => {
+  it("converts Tythan Code tool defs to OpenAI function-tool shape", () => {
     const tools = toOpenAiTools(TOOL_DEFINITIONS);
     expect(tools).toHaveLength(TOOL_DEFINITIONS.length);
     const read = tools.find((t) => t.type === "function" && t.function.name === "read_file");

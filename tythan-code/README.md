@@ -1,4 +1,4 @@
-# mini-cursor for VS Code
+# Tythan Code
 
 **The AI coding agent that won't ship vulnerabilities — now inside your editor.**
 
@@ -27,13 +27,13 @@ extensions, not forks.)
 
 ## Features
 
-- **Chat sidebar** — click the mini-cursor icon in the activity bar. Streams
+- **Chat sidebar** — click the Tythan Code icon in the activity bar. Streams
   the model's answer live; shows tool calls and their results inline.
 - **Agentic file edits with real diffs** — `write_file`/`edit_file` open VS
   Code's built-in diff editor (before vs. proposed after) and ask you to
   confirm before anything is written. `run_command` asks before running,
   too.
-- **Undo (`mini-cursor: Undo Last Agent Change`)** — every agent-authored
+- **Undo (`Tythan Code: Undo Last Agent Change`)** — every agent-authored
   file change is checkpointed before it happens. One command reverts a
   whole turn's file changes. Files over 5MB or that aren't valid UTF-8 are
   skipped rather than checkpointed (so undo never "restores" a corrupted
@@ -41,13 +41,13 @@ extensions, not forks.)
 - **Automatic context compaction** — long sessions don't hit a hard
   context-length error. When the conversation approaches the model's context
   window, older turns get summarized into one message and the most recent
-  turns are kept verbatim. `mini-cursor: Compact Context Now` / `mini-cursor:
+  turns are kept verbatim. `Tythan Code: Compact Context Now` / `Tythan Code:
   Show Context Usage` for manual control and visibility.
 - **Built-in security scanner** — the same regex-based rule set as the CLI:
   leaked secrets/API keys, dangerous code patterns (`eval`, `pickle.loads`,
   SQL built from f-strings, `shell=True`, disabled TLS verification, weak
   ciphers, ...), insecure config (wildcard CORS, JWT `none`, `0.0.0.0`
-  binds). Available to the agent as a tool and directly via `mini-cursor:
+  binds). Available to the agent as a tool and directly via `Tythan Code:
   Run Security Audit`.
 - **Inline tab-completion** (ghost text) — see [Limitations](#limitations)
   below; this is real but slower than Copilot/Cursor's dedicated completion
@@ -62,57 +62,57 @@ extensions, not forks.)
 ## Install (from source — not yet published to the Marketplace)
 
 ```bash
-cd mini-cursor-vscode
+cd tythan-code
 npm install
 npm run build            # bundles src/extension.ts -> dist/extension.js
-npm run package          # -> mini-cursor-0.1.0.vsix
-code --install-extension mini-cursor-0.1.0.vsix
+npm run package          # -> tythan-code-0.1.0.vsix
+code --install-extension tythan-code-0.1.0.vsix
 ```
 
 Or press `F5` in VS Code with this folder open to launch an Extension
 Development Host with it loaded, no packaging needed.
 
-Set an API key: run **mini-cursor: Set API Key for Provider** from the
+Set an API key: run **Tythan Code: Set API Key for Provider** from the
 Command Palette (stored via VS Code's SecretStorage — never written to
 settings.json). If `ANTHROPIC_API_KEY`/`OPENAI_API_KEY`/`OPENROUTER_API_KEY`
-is already set in your environment, mini-cursor picks that up automatically
+is already set in your environment, Tythan Code picks that up automatically
 as a fallback.
 
 ## Settings
 
 | Setting | Default | Description |
 |---|---|---|
-| `miniCursor.provider` | `anthropic` | `anthropic` \| `openai` \| `openrouter` \| `ollama` \| `custom` |
-| `miniCursor.model` | `claude-opus-4-8` | Model id for the active provider |
-| `miniCursor.effort` | `high` | Reasoning effort (Anthropic only): low/medium/high/xhigh/max |
-| `miniCursor.contextWindow` | _(auto)_ | Override the assumed context window in tokens |
-| `miniCursor.customBaseUrl` | _(empty)_ | Base URL when provider is `custom` (or to override the default for `openai`/`openrouter`/`ollama`) |
-| `miniCursor.maxOutputTokens` | `8192` | Max tokens reserved for a single response |
-| `miniCursor.yolo` | `false` | Auto-approve every write/edit/command — **dangerous** |
-| `miniCursor.checkpointsEnabled` | `true` | Record checkpoints for undo |
-| `miniCursor.compactKeepRounds` | `2` | Turns kept verbatim when compacting |
-| `miniCursor.inlineCompletion.enabled` | `true` | Show inline tab-completions |
-| `miniCursor.inlineCompletion.debounceMs` | `400` | Delay after you stop typing before requesting a completion |
+| `tythanCode.provider` | `anthropic` | `anthropic` \| `openai` \| `openrouter` \| `ollama` \| `custom` |
+| `tythanCode.model` | `claude-opus-4-8` | Model id for the active provider |
+| `tythanCode.effort` | `high` | Reasoning effort (Anthropic only): low/medium/high/xhigh/max |
+| `tythanCode.contextWindow` | _(auto)_ | Override the assumed context window in tokens |
+| `tythanCode.customBaseUrl` | _(empty)_ | Base URL when provider is `custom` (or to override the default for `openai`/`openrouter`/`ollama`) |
+| `tythanCode.maxOutputTokens` | `8192` | Max tokens reserved for a single response |
+| `tythanCode.yolo` | `false` | Auto-approve every write/edit/command — **dangerous** |
+| `tythanCode.checkpointsEnabled` | `true` | Record checkpoints for undo |
+| `tythanCode.compactKeepRounds` | `2` | Turns kept verbatim when compacting |
+| `tythanCode.inlineCompletion.enabled` | `true` | Show inline tab-completions |
+| `tythanCode.inlineCompletion.debounceMs` | `400` | Delay after you stop typing before requesting a completion |
 
 Local model context windows default conservatively (8k) since local servers
 commonly run with a much smaller context than the underlying model supports
-unless configured otherwise — set `miniCursor.contextWindow` explicitly if
+unless configured otherwise — set `tythanCode.contextWindow` explicitly if
 you've raised it.
 
 ### Commands
 
 All available from the Command Palette (`Cmd/Ctrl+Shift+P`):
 
-- **mini-cursor: Open Chat**
-- **mini-cursor: New Chat Session** — clears the conversation
-- **mini-cursor: Undo Last Agent Change**
-- **mini-cursor: Show Checkpoints**
-- **mini-cursor: Compact Context Now**
-- **mini-cursor: Show Context Usage**
-- **mini-cursor: Run Security Audit**
-- **mini-cursor: Toggle Auto-Approve (YOLO) Mode**
-- **mini-cursor: Set API Key for Provider**
-- **mini-cursor: Toggle Inline Tab-Completion**
+- **Tythan Code: Open Chat**
+- **Tythan Code: New Chat Session** — clears the conversation
+- **Tythan Code: Undo Last Agent Change**
+- **Tythan Code: Show Checkpoints**
+- **Tythan Code: Compact Context Now**
+- **Tythan Code: Show Context Usage**
+- **Tythan Code: Run Security Audit**
+- **Tythan Code: Toggle Auto-Approve (YOLO) Mode**
+- **Tythan Code: Set API Key for Provider**
+- **Tythan Code: Toggle Inline Tab-Completion**
 
 ## Limitations
 
@@ -126,7 +126,7 @@ Said plainly, because it matters more than it would in a marketing page:
   more per suggestion, provider-dependent — useful, but not as snappy.
 - **`run_command` isn't covered by undo.** There's no honest way to snapshot
   and revert an arbitrary shell command's effects. Checkpoints only cover
-  `write_file`/`edit_file`, which mini-cursor fully controls.
+  `write_file`/`edit_file`, which Tythan Code fully controls.
 - **No dependency-CVE (SCA) scanning.** The CLI's OSV.dev-backed dependency
   check (`sca.py`) wasn't ported in this pass — the security scanner here
   covers secrets/code-pattern/config rules only. Worth adding later; cut for
@@ -194,7 +194,7 @@ guessed):
 ## Architecture
 
 ```
-mini-cursor-vscode/
+tythan-code/
 ├── src/
 │   ├── extension.ts              # activation: the only file that wires vscode + core together
 │   ├── core/                     # vscode-independent — fully unit tested

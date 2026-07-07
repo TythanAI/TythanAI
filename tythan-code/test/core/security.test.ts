@@ -122,7 +122,7 @@ describe("scanWorkspace", () => {
   let dir: string;
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "mini-cursor-sec-"));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "tythan-code-sec-"));
   });
 
   afterEach(() => {
@@ -162,7 +162,7 @@ describe("formatFindings", () => {
   let dir: string;
 
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), "mini-cursor-sec-fmt-"));
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), "tythan-code-sec-fmt-"));
   });
 
   afterEach(() => {

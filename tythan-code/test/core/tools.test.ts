@@ -6,7 +6,7 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { ToolError, Workspace, expandMentions, globToRegExp, truncate } from "../../src/core/tools";
 
 function makeTmpWorkspace(): { dir: string; ws: Workspace } {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mini-cursor-test-"));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "tythan-code-test-"));
   return { dir, ws: new Workspace(dir) };
 }
 

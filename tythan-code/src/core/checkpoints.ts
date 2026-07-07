@@ -9,7 +9,7 @@
  * didn't exist before the turn).
  *
  * Scope, on purpose: this only covers write_file/edit_file, the two tools
- * mini-cursor fully controls and already diffs before applying. run_command
+ * Tythan Code fully controls and already diffs before applying. run_command
  * can do anything — there is no honest way to snapshot and revert that
  * generically, so it isn't covered. This is a safety net for agent-authored
  * file edits, not a full VM undo.

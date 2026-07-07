@@ -29,7 +29,7 @@ interface IncomingMessage {
 }
 
 export class ChatViewProvider implements vscode.WebviewViewProvider, AgentSink {
-  static readonly viewType = "miniCursor.chatView";
+  static readonly viewType = "tythanCode.chatView";
 
   private view: vscode.WebviewView | undefined;
   private queue: OutgoingMessage[] = [];
@@ -228,7 +228,7 @@ const PAGE_TEMPLATE = `<!DOCTYPE html>
   <div id="banner">not connected</div>
   <div id="messages"></div>
   <div id="inputRow">
-    <textarea id="input" rows="2" placeholder="Ask mini-cursor... (@file to attach)"></textarea>
+    <textarea id="input" rows="2" placeholder="Ask Tythan Code... (@file to attach)"></textarea>
     <button id="send">Send</button>
   </div>
 <script nonce="__NONCE__">

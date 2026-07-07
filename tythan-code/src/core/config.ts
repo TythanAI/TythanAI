@@ -12,7 +12,7 @@ export const DEFAULT_MAX_TOKENS = 8_192;
 export const LOCAL_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"];
 
 // Deliberately conservative guesses, not exact per-model figures — they only
-// drive when mini-cursor proactively summarizes old history, so erring small
+// drive when Tythan Code proactively summarizes old history, so erring small
 // (extra compaction) is far cheaper than erring large (a hard context-length
 // error mid-turn). Override per provider with an explicit contextWindow.
 export const DEFAULT_ANTHROPIC_CONTEXT_WINDOW = 200_000;

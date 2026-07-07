@@ -1,5 +1,5 @@
 /**
- * Reads mini-cursor's settings from VS Code configuration + SecretStorage
+ * Reads Tythan Code's settings from VS Code configuration + SecretStorage
  * and turns them into the plain config objects `core/` expects. This is the
  * only place that talks to `vscode.workspace.getConfiguration` for provider
  * settings, so the core agent stays fully decoupled from VS Code.
@@ -10,8 +10,8 @@ import * as vscode from "vscode";
 import type { AgentConfig, EffortLevel, ProviderConfig, ProviderType } from "../core/config";
 import { defaultAgentConfig } from "../core/config";
 
-const SECTION = "miniCursor";
-const SECRET_PREFIX = "miniCursor.apiKey.";
+const SECTION = "tythanCode";
+const SECRET_PREFIX = "tythanCode.apiKey.";
 const EFFORT_LEVELS: readonly EffortLevel[] = ["low", "medium", "high", "xhigh", "max"];
 
 function providerTypeFor(provider: string): ProviderType {
@@ -33,7 +33,7 @@ function defaultBaseUrlFor(provider: string): string | undefined {
 
 /** Env vars users commonly already have set from using the CLI tools these
  * providers ship — checked as a convenience fallback if no key was stored
- * via the "mini-cursor: Set API Key" command. */
+ * via the "Tythan Code: Set API Key" command. */
 function envKeyFor(provider: string): string | undefined {
   switch (provider) {
     case "anthropic":

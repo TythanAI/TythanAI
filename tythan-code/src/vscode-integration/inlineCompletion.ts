@@ -36,7 +36,7 @@ export function stripFence(text: string): string {
   return (fenced ? fenced[1] : trimmed) ?? "";
 }
 
-export class MiniCursorInlineCompletionProvider implements vscode.InlineCompletionItemProvider {
+export class TythanCodeInlineCompletionProvider implements vscode.InlineCompletionItemProvider {
   private debounceTimer: ReturnType<typeof setTimeout> | undefined;
   private debounceGeneration = 0;
 

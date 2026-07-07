@@ -95,7 +95,7 @@ class FakeApprover implements ToolApprover {
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mini-cursor-agent-"));
+  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "tythan-code-agent-"));
 });
 
 afterEach(() => {

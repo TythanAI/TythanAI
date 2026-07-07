@@ -1,6 +1,6 @@
 {
-  "name": "mini-cursor",
-  "displayName": "mini-cursor",
+  "name": "tythan-code",
+  "displayName": "Tythan Code",
   "description": "The AI coding agent that won't ship vulnerabilities — chat, agentic edits, inline tab-completion and a built-in security auditor, right inside VS Code.",
   "version": "0.1.0",
   "publisher": "tythanai",
@@ -9,7 +9,7 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/TythanAI/TythanAI.git",
-    "directory": "mini-cursor-vscode"
+    "directory": "tythan-code"
   },
   "engines": {
     "vscode": "^1.90.0",
@@ -33,77 +33,77 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "mini-cursor",
-          "title": "mini-cursor",
+          "id": "tythanCode",
+          "title": "Tythan Code",
           "icon": "media/icon.svg"
         }
       ]
     },
     "views": {
-      "mini-cursor": [
+      "tythanCode": [
         {
           "type": "webview",
-          "id": "miniCursor.chatView",
+          "id": "tythanCode.chatView",
           "name": "Chat"
         }
       ]
     },
     "commands": [
       {
-        "command": "miniCursor.openChat",
-        "title": "mini-cursor: Open Chat",
+        "command": "tythanCode.openChat",
+        "title": "Tythan Code: Open Chat",
         "icon": "$(comment-discussion)"
       },
       {
-        "command": "miniCursor.newSession",
-        "title": "mini-cursor: New Chat Session"
+        "command": "tythanCode.newSession",
+        "title": "Tythan Code: New Chat Session"
       },
       {
-        "command": "miniCursor.undo",
-        "title": "mini-cursor: Undo Last Agent Change"
+        "command": "tythanCode.undo",
+        "title": "Tythan Code: Undo Last Agent Change"
       },
       {
-        "command": "miniCursor.showCheckpoints",
-        "title": "mini-cursor: Show Checkpoints"
+        "command": "tythanCode.showCheckpoints",
+        "title": "Tythan Code: Show Checkpoints"
       },
       {
-        "command": "miniCursor.compact",
-        "title": "mini-cursor: Compact Context Now"
+        "command": "tythanCode.compact",
+        "title": "Tythan Code: Compact Context Now"
       },
       {
-        "command": "miniCursor.showContext",
-        "title": "mini-cursor: Show Context Usage"
+        "command": "tythanCode.showContext",
+        "title": "Tythan Code: Show Context Usage"
       },
       {
-        "command": "miniCursor.audit",
-        "title": "mini-cursor: Run Security Audit"
+        "command": "tythanCode.audit",
+        "title": "Tythan Code: Run Security Audit"
       },
       {
-        "command": "miniCursor.toggleYolo",
-        "title": "mini-cursor: Toggle Auto-Approve (YOLO) Mode"
+        "command": "tythanCode.toggleYolo",
+        "title": "Tythan Code: Toggle Auto-Approve (YOLO) Mode"
       },
       {
-        "command": "miniCursor.setApiKey",
-        "title": "mini-cursor: Set API Key for Provider"
+        "command": "tythanCode.setApiKey",
+        "title": "Tythan Code: Set API Key for Provider"
       },
       {
-        "command": "miniCursor.toggleInlineCompletion",
-        "title": "mini-cursor: Toggle Inline Tab-Completion"
+        "command": "tythanCode.toggleInlineCompletion",
+        "title": "Tythan Code: Toggle Inline Tab-Completion"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "miniCursor.newSession",
-          "when": "view == miniCursor.chatView",
+          "command": "tythanCode.newSession",
+          "when": "view == tythanCode.chatView",
           "group": "navigation"
         }
       ]
     },
     "configuration": {
-      "title": "mini-cursor",
+      "title": "Tythan Code",
       "properties": {
-        "miniCursor.provider": {
+        "tythanCode.provider": {
           "type": "string",
           "default": "anthropic",
           "enum": [
@@ -115,12 +115,12 @@
           ],
           "description": "Which configured provider to use for chat/agent turns."
         },
-        "miniCursor.model": {
+        "tythanCode.model": {
           "type": "string",
           "default": "claude-opus-4-8",
           "description": "Model id for the active provider."
         },
-        "miniCursor.effort": {
+        "tythanCode.effort": {
           "type": "string",
           "default": "high",
           "enum": [
@@ -132,7 +132,7 @@
           ],
           "description": "Reasoning effort (Anthropic models only)."
         },
-        "miniCursor.contextWindow": {
+        "tythanCode.contextWindow": {
           "type": [
             "number",
             "null"
@@ -140,37 +140,37 @@
           "default": null,
           "description": "Override the assumed context window (tokens) for the active provider. Leave unset to use a conservative built-in default."
         },
-        "miniCursor.maxOutputTokens": {
+        "tythanCode.maxOutputTokens": {
           "type": "number",
           "default": 8192,
           "description": "Max tokens reserved for a single model response."
         },
-        "miniCursor.customBaseUrl": {
+        "tythanCode.customBaseUrl": {
           "type": "string",
           "default": "",
-          "description": "Base URL for an OpenAI-compatible endpoint, used when miniCursor.provider is \"openai\", \"openrouter\", \"ollama\" or \"custom\"."
+          "description": "Base URL for an OpenAI-compatible endpoint, used when tythanCode.provider is \"openai\", \"openrouter\", \"ollama\" or \"custom\"."
         },
-        "miniCursor.yolo": {
+        "tythanCode.yolo": {
           "type": "boolean",
           "default": false,
           "description": "Auto-approve every file write/edit/command without asking. Dangerous — off by default."
         },
-        "miniCursor.checkpointsEnabled": {
+        "tythanCode.checkpointsEnabled": {
           "type": "boolean",
           "default": true,
-          "description": "Record a pre-edit checkpoint before every agent-authored file change, so it can be undone with 'mini-cursor: Undo Last Agent Change'."
+          "description": "Record a pre-edit checkpoint before every agent-authored file change, so it can be undone with 'Tythan Code: Undo Last Agent Change'."
         },
-        "miniCursor.compactKeepRounds": {
+        "tythanCode.compactKeepRounds": {
           "type": "number",
           "default": 2,
           "description": "Number of most-recent conversation turns kept verbatim when the context is compacted."
         },
-        "miniCursor.inlineCompletion.enabled": {
+        "tythanCode.inlineCompletion.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Show AI inline tab-completions (ghost text) as you type."
         },
-        "miniCursor.inlineCompletion.debounceMs": {
+        "tythanCode.inlineCompletion.debounceMs": {
           "type": "number",
           "default": 400,
           "description": "How long to wait after you stop typing before requesting an inline completion."
