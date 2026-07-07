@@ -21,8 +21,10 @@ import { capHead, estimateTokensHeuristic, isRoundBoundary, splitIntoRounds } fr
 import type { NativeMessage } from "./compaction";
 import { CheckpointStore } from "./checkpoints";
 import type { Checkpoint } from "./checkpoints";
+import { loadRulesText } from "./rules";
 import { formatFindings, scanWorkspace } from "./security";
 import { MAX_READ_LINES, MUTATING_TOOLS, TOOL_DEFINITIONS, ToolError, Workspace } from "./tools";
+import type { ToolDefinition } from "./tools";
 import type { Backend, ToolResultInput } from "./providers/types";
 
 // Compact when the estimated context in use crosses this fraction of the
@@ -137,8 +139,11 @@ export class Agent {
     private approver: ToolApprover,
     backend: Backend,
     checkpointStore: CheckpointStore,
+    workspace?: Workspace,
   ) {
-    this.workspace = new Workspace(config.workspaceRoot);
+    // An injected workspace lets composer mode run the same agent loop
+    // against an OverlayWorkspace that stages changes instead of writing.
+    this.workspace = workspace ?? new Workspace(config.workspaceRoot);
     this.backend = backend;
     this.checkpoints = checkpointStore;
   }
@@ -165,7 +170,26 @@ export class Agent {
   }
 
   systemPrompt(): string {
-    return `${SYSTEM_PROMPT}\nWorkspace root: ${this.workspace.root}`;
+    let prompt = `${SYSTEM_PROMPT}\nWorkspace root: ${this.workspace.root}`;
+    if (this.config.systemPromptExtra) {
+      prompt += `\n\n${this.config.systemPromptExtra}`;
+    }
+    // Re-read each call: it's one tiny file and means rules edits apply on
+    // the very next turn without any file-watcher plumbing.
+    const rules = loadRulesText(this.workspace.root);
+    if (rules) {
+      prompt += `\n\nProject rules (from ${rules.source} — follow these):\n${rules.text}`;
+    }
+    return prompt;
+  }
+
+  /** Tools advertised to the model this turn (config can disable some). */
+  toolDefinitions(): ToolDefinition[] {
+    const disabled = this.config.disabledTools;
+    if (!disabled || disabled.length === 0) {
+      return TOOL_DEFINITIONS;
+    }
+    return TOOL_DEFINITIONS.filter((t) => !disabled.includes(t.name));
   }
 
   /** Auto-approve every mutating tool call without asking. Dangerous — surfaced
@@ -188,6 +212,9 @@ export class Agent {
   private async executeTool(name: string, toolInput: Record<string, unknown>): Promise<{ output: string; isError: boolean }> {
     const ws = this.workspace;
     try {
+      if (this.config.disabledTools?.includes(name)) {
+        return { output: `The ${name} tool is not available in this mode.`, isError: true };
+      }
       if (MUTATING_TOOLS.has(name) && !(await this.approve(name, toolInput))) {
         return { output: "The user declined this action. Ask them how to proceed or try another approach.", isError: true };
       }
@@ -386,7 +413,7 @@ export class Agent {
 
         let result;
         try {
-          result = await this.backend.streamTurn(this.messages, this.systemPrompt(), TOOL_DEFINITIONS, this.sink, abort.signal);
+          result = await this.backend.streamTurn(this.messages, this.systemPrompt(), this.toolDefinitions(), this.sink, abort.signal);
         } catch (err) {
           if (abort.signal.aborted) {
             // The user hit Stop mid-stream: the SDK rejects with an abort

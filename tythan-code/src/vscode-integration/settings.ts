@@ -92,6 +92,12 @@ export function inlineCompletionDebounceMs(): number {
   return vscode.workspace.getConfiguration(SECTION).get<number>("inlineCompletion.debounceMs", 400);
 }
 
+/** Optional dedicated (smaller/faster) model for inline tab-completion.
+ * Empty means "use the main chat model". */
+export function inlineCompletionModel(): string {
+  return vscode.workspace.getConfiguration(SECTION).get<string>("inlineCompletion.model", "").trim();
+}
+
 export async function setApiKeyForProvider(context: vscode.ExtensionContext, provider: string, apiKey: string): Promise<void> {
   await context.secrets.store(SECRET_PREFIX + provider, apiKey);
 }

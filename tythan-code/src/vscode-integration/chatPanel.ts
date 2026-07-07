@@ -8,10 +8,13 @@ import * as crypto from "node:crypto";
 import * as vscode from "vscode";
 
 import type { Agent, AgentSink } from "../core/agent";
+import type { TranscriptEntry } from "../core/sessionStore";
+import { MAX_ENTRY_CHARS, MAX_TRANSCRIPT_ENTRIES } from "../core/sessionStore";
 import { runTurnSafely } from "./runTurnSafely";
 
 type OutgoingMessage =
   | { type: "assistantStart" }
+  | { type: "user"; text: string }
   | { type: "text"; chunk: string }
   | { type: "thinking" }
   | { type: "flush" }
@@ -36,6 +39,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, AgentSink {
   private view: vscode.WebviewView | undefined;
   private queue: OutgoingMessage[] = [];
   private ready = false;
+  private busyNow = false;
+
+  // Display transcript — the authoritative record the webview is a view of.
+  // Rebuilding the webview (sidebar closed/reopened, editor restart with a
+  // persisted session) replays this rather than losing the conversation.
+  private transcript: TranscriptEntry[] = [];
+  private pendingAssistant: string | null = null;
+
+  /** Extra stop hook, so Stop also aborts auxiliary agents (composer). */
+  extraStop: (() => void) | undefined;
+
+  /** Called after anything that changes the persisted session (a finished
+   * turn, a cleared session) — the extension saves the SessionStore here. */
+  onSessionChanged: (() => void) | undefined;
 
   constructor(
     private readonly getAgent: () => Agent,
@@ -51,7 +68,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, AgentSink {
     webviewView.webview.onDidReceiveMessage((message: IncomingMessage) => {
       if (message.type === "ready") {
         this.ready = true;
+        // The transcript replay below covers everything queued while the
+        // view was closed — keep only messages replay can't reproduce.
+        this.queue = this.queue.filter((m) => m.type === "prefill");
         this.post({ type: "banner", ...this.describeBanner() });
+        this.replayTranscript();
+        this.post({ type: "busy", value: this.busyNow });
         this.flushQueue();
         return;
       }
@@ -85,7 +107,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, AgentSink {
   newSession(): void {
     try {
       this.getAgent().reset();
+      this.transcript = [];
+      this.pendingAssistant = null;
       this.post({ type: "cleared" });
+      this.onSessionChanged?.();
     } catch (err) {
       this.error((err as Error).message);
     }
@@ -98,6 +123,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, AgentSink {
     } catch {
       // no agent (no folder open) — nothing to stop
     }
+    this.extraStop?.();
+  }
+
+  /** Restore a persisted transcript (rendered on the next webview "ready"). */
+  setTranscript(entries: TranscriptEntry[]): void {
+    this.transcript = [...entries];
+  }
+
+  getTranscript(): TranscriptEntry[] {
+    return [...this.transcript];
+  }
+
+  /** Toggle the input's busy state — used by flows that drive the agent
+   * outside handleUserMessage (composer). */
+  setBusy(value: boolean): void {
+    this.busyNow = value;
+    this.post({ type: "busy", value });
   }
 
   /** Re-send the banner (workspace / backend / yolo) — call after anything
@@ -117,21 +159,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, AgentSink {
   }
 
   private async handleUserMessage(text: string): Promise<void> {
-    this.post({ type: "busy", value: true });
+    this.pushEntry({ kind: "user", text });
+    this.setBusy(true);
     try {
       const agent = this.getAgent(); // may throw synchronously (e.g. no folder open)
       await runTurnSafely(agent, this, text);
     } catch (err) {
       this.error((err as Error).message);
     } finally {
-      this.post({ type: "busy", value: false });
+      this.setBusy(false);
+      this.onSessionChanged?.();
     }
   }
 
   private post(message: OutgoingMessage): void {
     if (this.view && this.ready) {
       void this.view.webview.postMessage(message);
-    } else {
+    } else if (message.type === "prefill") {
+      // Everything else is reconstructed from the transcript on "ready";
+      // a prefill isn't part of the transcript, so keep it for the flush.
       this.queue.push(message);
     }
   }
@@ -143,30 +189,93 @@ export class ChatViewProvider implements vscode.WebviewViewProvider, AgentSink {
     this.queue = [];
   }
 
+  private pushEntry(entry: TranscriptEntry): void {
+    this.transcript.push({ ...entry, text: entry.text.slice(0, MAX_ENTRY_CHARS) });
+    if (this.transcript.length > MAX_TRANSCRIPT_ENTRIES) {
+      this.transcript.splice(0, this.transcript.length - MAX_TRANSCRIPT_ENTRIES);
+    }
+  }
+
+  private closePendingAssistant(): void {
+    if (this.pendingAssistant !== null && this.pendingAssistant !== "") {
+      this.pushEntry({ kind: "assistant", text: this.pendingAssistant });
+    }
+    this.pendingAssistant = null;
+  }
+
+  private replayTranscript(): void {
+    for (const entry of this.transcript) {
+      switch (entry.kind) {
+        case "user":
+          this.post({ type: "user", text: entry.text });
+          break;
+        case "assistant":
+          this.post({ type: "assistantStart" });
+          this.post({ type: "text", chunk: entry.text });
+          this.post({ type: "flush" });
+          break;
+        case "toolCall":
+          this.post({ type: "toolCall", name: entry.name ?? "tool", input: entry.text });
+          break;
+        case "toolResult":
+          this.post({ type: "toolResult", output: entry.text, isError: entry.isError ?? false });
+          break;
+        case "info":
+          this.post({ type: "info", message: entry.text });
+          break;
+        case "error":
+          this.post({ type: "error", message: entry.text });
+          break;
+      }
+    }
+    // A turn streaming right now: re-open the partial assistant message so
+    // subsequent chunks keep appending to it.
+    if (this.pendingAssistant !== null) {
+      this.post({ type: "assistantStart" });
+      if (this.pendingAssistant) {
+        this.post({ type: "text", chunk: this.pendingAssistant });
+      }
+    }
+  }
+
   // -- AgentSink ----------------------------------------------------------
 
   assistantPrefix(): void {
+    this.closePendingAssistant();
+    this.pendingAssistant = "";
     this.post({ type: "assistantStart" });
   }
   streamText(chunk: string): void {
+    this.pendingAssistant = (this.pendingAssistant ?? "") + chunk;
     this.post({ type: "text", chunk });
   }
   thinkingStarted(): void {
     this.post({ type: "thinking" });
   }
   flushStream(): void {
+    this.closePendingAssistant();
     this.post({ type: "flush" });
   }
   toolCall(name: string, input: Record<string, unknown>): void {
+    let preview: string;
+    try {
+      preview = JSON.stringify(input);
+    } catch {
+      preview = String(input);
+    }
+    this.pushEntry({ kind: "toolCall", name, text: preview });
     this.post({ type: "toolCall", name, input });
   }
   toolResult(output: string, isError: boolean): void {
+    this.pushEntry({ kind: "toolResult", text: output, isError });
     this.post({ type: "toolResult", output, isError });
   }
   info(message: string): void {
+    this.pushEntry({ kind: "info", text: message });
     this.post({ type: "info", message });
   }
   error(message: string): void {
+    this.pushEntry({ kind: "error", text: message });
     this.post({ type: "error", message });
   }
 }
@@ -432,6 +541,9 @@ const PAGE_TEMPLATE = `<!DOCTYPE html>
           (msg.yolo ? '  &middot;  <span class="yolo">yolo (no confirmations)</span>' : '');
         break;
       }
+      case 'user':
+        appendMessage('user', msg.text);
+        break;
       case 'assistantStart':
         currentAssistantEl = appendMessage('assistant', '');
         currentAssistantRaw = '';
@@ -453,7 +565,8 @@ const PAGE_TEMPLATE = `<!DOCTYPE html>
         const div = document.createElement('div');
         div.className = 'tool-call';
         let preview;
-        try { preview = JSON.stringify(msg.input); } catch (e) { preview = String(msg.input); }
+        if (typeof msg.input === 'string') { preview = msg.input; }
+        else { try { preview = JSON.stringify(msg.input); } catch (e) { preview = String(msg.input); } }
         if (preview && preview.length > 200) preview = preview.slice(0, 200) + '…';
         div.textContent = '⚙ ' + msg.name + ' ' + (preview || '');
         messagesEl.appendChild(div);

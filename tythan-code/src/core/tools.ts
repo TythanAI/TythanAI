@@ -169,16 +169,42 @@ export class Workspace {
     return path.relative(this.root, absPath).split(path.sep).join("/");
   }
 
+  // -- overridable file access --------------------------------------------
+  // OverlayWorkspace (composer mode) reroutes these three so staged-but-not-
+  // yet-applied changes are visible to every read-side tool.
+
+  protected fileExists(target: string): boolean {
+    return fs.existsSync(target) && fs.statSync(target).isFile();
+  }
+
+  protected readTextFile(target: string): string {
+    return fs.readFileSync(target, "utf-8");
+  }
+
+  protected candidateFiles(cap: number): string[] {
+    return walkFiles(this.root, cap);
+  }
+
   // -- read-only tools ----------------------------------------------------
+
+  /** Raw file content (no line numbers, no truncation) — for internal
+   * consumers like the codebase index. Overlay-aware like readFile. */
+  readRaw(relPath: string): string {
+    const target = this.resolve(relPath);
+    if (!this.fileExists(target)) {
+      throw new ToolError(`File not found: ${relPath}`);
+    }
+    return this.readTextFile(target);
+  }
 
   readFile(relPath: string, offset = 1, limit: number = MAX_READ_LINES): string {
     const target = this.resolve(relPath);
-    if (!fs.existsSync(target) || !fs.statSync(target).isFile()) {
+    if (!this.fileExists(target)) {
       throw new ToolError(`File not found: ${relPath}`);
     }
     let text: string;
     try {
-      text = fs.readFileSync(target, "utf-8");
+      text = this.readTextFile(target);
     } catch (err) {
       throw new ToolError(`Cannot read ${relPath}: ${(err as Error).message}`);
     }
@@ -196,7 +222,7 @@ export class Workspace {
 
   listFiles(pattern = "**/*"): string {
     const rx = globToRegExp(pattern);
-    const files = walkFiles(this.root, 20_000)
+    const files = this.candidateFiles(20_000)
       .map((abs) => this.relativeDisplay(abs))
       .filter((rel) => rx.test(rel))
       .sort();
@@ -218,7 +244,7 @@ export class Workspace {
     }
     const globRx = globToRegExp(glob);
     const hits: string[] = [];
-    const files = walkFiles(this.root, 20_000)
+    const files = this.candidateFiles(20_000)
       .map((abs) => ({ abs, rel: this.relativeDisplay(abs) }))
       .filter(({ rel }) => globRx.test(rel))
       .sort((a, b) => a.rel.localeCompare(b.rel));
@@ -226,7 +252,7 @@ export class Workspace {
     outer: for (const { abs, rel } of files) {
       let text: string;
       try {
-        text = fs.readFileSync(abs, "utf-8");
+        text = this.readTextFile(abs);
       } catch {
         continue;
       }
@@ -254,11 +280,10 @@ export class Workspace {
   prepareWrite(relPath: string): { target: string; old: string } {
     const target = this.resolve(relPath);
     let old = "";
-    if (fs.existsSync(target)) {
-      if (!fs.statSync(target).isFile()) {
-        throw new ToolError(`Not a regular file: ${relPath}`);
-      }
-      old = fs.readFileSync(target, "utf-8");
+    if (this.fileExists(target)) {
+      old = this.readTextFile(target);
+    } else if (fs.existsSync(target)) {
+      throw new ToolError(`Not a regular file: ${relPath}`);
     }
     return { target, old };
   }
@@ -278,10 +303,10 @@ export class Workspace {
     replaceAll = false,
   ): { target: string; old: string; updated: string } {
     const target = this.resolve(relPath);
-    if (!fs.existsSync(target) || !fs.statSync(target).isFile()) {
+    if (!this.fileExists(target)) {
       throw new ToolError(`File not found: ${relPath}`);
     }
-    const text = fs.readFileSync(target, "utf-8");
+    const text = this.readTextFile(target);
     const count = countOccurrences(text, oldString);
     if (count === 0) {
       throw new ToolError("old_string not found in file — read the file and match it exactly");

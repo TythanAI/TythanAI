@@ -35,21 +35,36 @@ function languageForPath(relPath: string): string | undefined {
   return LANGUAGE_BY_EXTENSION[path.extname(relPath).toLowerCase()];
 }
 
+function diffTitle(relPath: string): string {
+  return `Tythan Code: ${relPath} (proposed change)`;
+}
+
 export class VscodeToolApprover implements ToolApprover {
-  async confirmDiff(preview: DiffPreview): Promise<boolean> {
+  /** Open the before/after diff without asking anything — flows that run
+   * their own accept/skip dialog (composer review) build on this. */
+  async showDiffPreview(preview: DiffPreview): Promise<void> {
     const language = languageForPath(preview.path);
     const [beforeDoc, afterDoc] = await Promise.all([
       vscode.workspace.openTextDocument({ content: preview.before, language }),
       vscode.workspace.openTextDocument({ content: preview.after, language }),
     ]);
-    const title = `Tythan Code: ${preview.path} (proposed change)`;
-    await vscode.commands.executeCommand("vscode.diff", beforeDoc.uri, afterDoc.uri, title, { preview: true });
+    await vscode.commands.executeCommand("vscode.diff", beforeDoc.uri, afterDoc.uri, diffTitle(preview.path), {
+      preview: true,
+    });
+  }
+
+  async closePreview(relPath: string): Promise<void> {
+    await closeDiffTab(diffTitle(relPath));
+  }
+
+  async confirmDiff(preview: DiffPreview): Promise<boolean> {
+    await this.showDiffPreview(preview);
     const choice = await vscode.window.showInformationMessage(
       `Tythan Code wants to write to ${preview.path}. Apply this change?`,
       { modal: true },
       "Apply",
     );
-    await closeDiffTab(title);
+    await this.closePreview(preview.path);
     return choice === "Apply";
   }
 

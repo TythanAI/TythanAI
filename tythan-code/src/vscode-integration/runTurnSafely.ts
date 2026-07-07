@@ -19,14 +19,18 @@ import {
 } from "openai";
 
 import type { Agent, AgentSink } from "../core/agent";
+import { expandCodebaseMention } from "../core/codebaseIndex";
 import { expandMentions } from "../core/tools";
 
 export async function runTurnSafely(agent: Agent, sink: AgentSink, text: string): Promise<void> {
   try {
-    // Pass the raw text as the checkpoint label — expandMentions() inlines
-    // full file contents into what the model sees, which would otherwise
-    // end up as unreadable noise in the checkpoints list.
-    const expanded = expandMentions(text, agent.workspace);
+    // Pass the raw text as the checkpoint label — the expansions below
+    // inline file contents / retrieved snippets into what the model sees,
+    // which would otherwise end up as unreadable noise in the checkpoints
+    // list. @codebase retrieval uses the *raw* text as the query so terms
+    // from already-attached files don't skew the ranking.
+    let expanded = expandMentions(text, agent.workspace);
+    expanded = expandCodebaseMention(expanded, agent.workspace, text);
     await agent.runTurn(expanded, text);
   } catch (err) {
     if (err instanceof AnthropicAuthenticationError || err instanceof OpenAIAuthenticationError) {

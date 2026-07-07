@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { Agent } from "../../src/core/agent";
 import type { AgentSink, ToolApprover, DiffPreview } from "../../src/core/agent";
+import { OverlayWorkspace } from "../../src/core/changeset";
 import { CheckpointStore } from "../../src/core/checkpoints";
 import { defaultAgentConfig } from "../../src/core/config";
 import type { AgentConfig } from "../../src/core/config";
@@ -493,6 +494,68 @@ describe("Agent.tokenBudget", () => {
   it("is unaffected for a large context window (no regression for the common case)", () => {
     const { agent } = makeAgent(new ScriptedBackend([], 200_000), { maxTokens: 64_000 });
     expect(agent.tokenBudget()).toBe(200_000 - 64_000);
+  });
+});
+
+describe("Agent config extensions", () => {
+  it("neither advertises nor executes disabled tools", async () => {
+    let advertised: string[] = [];
+    class ToolCapturingBackend extends ScriptedBackend {
+      override async streamTurn(
+        _messages?: unknown,
+        _system?: unknown,
+        tools?: Array<{ name: string }>,
+        _sink?: unknown,
+      ): Promise<TurnResult> {
+        this.calls++;
+        advertised = (tools ?? []).map((t) => t.name);
+        return this.turns.shift() ?? makeTurnResult("end");
+      }
+    }
+    const backend = new ToolCapturingBackend([
+      makeTurnResult("tool_use", [{ id: "tu_1", name: "run_command", input: { command: "echo hi" } }]),
+      makeTurnResult("end"),
+    ]);
+    const { agent } = makeAgent(backend, { disabledTools: ["run_command"] });
+    await agent.runTurn("run something");
+
+    expect(advertised).not.toContain("run_command");
+    expect(advertised).toContain("read_file");
+    const toolMsg = agent.messages[1] as unknown as { results: ToolResultInput[] };
+    expect(toolMsg.results[0]?.isError).toBe(true);
+    expect(toolMsg.results[0]?.output).toContain("not available");
+  });
+
+  it("appends systemPromptExtra to the system prompt", () => {
+    const { agent } = makeAgent(new ScriptedBackend([]), { systemPromptExtra: "COMPOSER MODE ACTIVE" });
+    expect(agent.systemPrompt()).toContain("COMPOSER MODE ACTIVE");
+  });
+
+  it("appends project rules from a .tythanrules file, fresh per call", () => {
+    const { agent } = makeAgent(new ScriptedBackend([]));
+    expect(agent.systemPrompt()).not.toContain("Project rules");
+    fs.writeFileSync(path.join(tmpDir, ".tythanrules"), "Always write tests first.");
+    const prompt = agent.systemPrompt();
+    expect(prompt).toContain("Project rules (from .tythanrules");
+    expect(prompt).toContain("Always write tests first.");
+  });
+
+  it("runs against an injected workspace (composer overlay wiring)", async () => {
+    const overlay = new OverlayWorkspace(tmpDir);
+    const backend = new ScriptedBackend([
+      makeTurnResult("tool_use", [{ id: "tu_1", name: "write_file", input: { path: "a.txt", content: "staged" } }]),
+      makeTurnResult("end"),
+    ]);
+    const config = defaultAgentConfig(tmpDir, { yolo: true, checkpointsEnabled: false });
+    const sink = new FakeSink();
+    const store = new CheckpointStore(tmpDir, path.join(tmpDir, ".checkpoints"));
+    const agent = new Agent(config, sink, new FakeApprover(), backend, store, overlay);
+
+    await agent.runTurn("stage a change");
+
+    expect(fs.existsSync(path.join(tmpDir, "a.txt"))).toBe(false); // disk untouched
+    expect(overlay.changes()).toHaveLength(1);
+    expect(overlay.changes()[0]?.after).toBe("staged");
   });
 });
 

@@ -33,6 +33,27 @@ extensions, not forks.)
   **Insert at cursor** buttons, and a **Stop** button aborts a generation
   mid-stream (history stays consistent — every started tool round is
   completed or cleanly skipped before the turn ends).
+- **Composer (`Ctrl+Alt+I` / `Cmd+Alt+I`)** — Cursor's multi-file editing
+  mode. Describe one task; the agent plans and edits as many files as
+  needed, but every change is *staged* in memory (the agent can read its own
+  staged edits back), nothing touches disk. At the end you review each
+  file's diff — Apply / Skip / Apply All — and everything applied is
+  recorded as one checkpoint, so a single Undo reverts the whole run.
+  `run_command` is disabled in this mode on purpose: staged changes aren't
+  on disk, so running tests would exercise the old code.
+- **@codebase context** — mention `@codebase` in a chat message and Tythan
+  Code retrieves the most relevant code chunks for your question (offline
+  TF-IDF over identifier-aware tokens — `getUserProfile` matches "user
+  profile") plus a project file map, and attaches them to the message. No
+  index build step, and no code leaves your machine for indexing.
+- **Persistent chat history** — the conversation (model history and rendered
+  transcript) survives closing the sidebar *and* restarting VS Code, per
+  workspace. Restored only when the provider+model still match; "New Chat
+  Session" clears it.
+- **Project rules files** — put instructions in `.tythanrules`,
+  `.cursorrules` (existing Cursor projects keep working unchanged) or
+  `AGENTS.md` at the workspace root and they're appended to the system
+  prompt on every turn. Edits apply on the next message — no reload.
 - **Inline edit (`Ctrl+Alt+K` / `Cmd+Alt+K`)** — the Cursor-style flow:
   select code (or just place the cursor), describe the change, review the
   proposed rewrite in VS Code's diff editor, apply with one click. Applied
@@ -64,9 +85,12 @@ extensions, not forks.)
   ciphers, ...), insecure config (wildcard CORS, JWT `none`, `0.0.0.0`
   binds). Available to the agent as a tool and directly via `Tythan Code:
   Run Security Audit`.
-- **Inline tab-completion** (ghost text) — see [Limitations](#limitations)
-  below; this is real but slower than Copilot/Cursor's dedicated completion
-  models.
+- **Inline tab-completion** (ghost text) — with an LRU response cache
+  (re-visiting the same spot answers instantly), a tight output cap, and an
+  optional dedicated fast model: set `tythanCode.inlineCompletion.model` to
+  a small model id (e.g. `claude-haiku-4-5-20251001`) to run completions on
+  it while chat stays on the big model. Still not a purpose-built FIM
+  endpoint — see [Limitations](#limitations).
 - **Any model** — native Anthropic, or any OpenAI-compatible endpoint
   (OpenAI, OpenRouter, Groq, DeepSeek, local servers via Ollama/LM
   Studio/vLLM). API keys are stored with VS Code's `SecretStorage`, not in
@@ -80,8 +104,8 @@ extensions, not forks.)
 cd tythan-code
 npm install
 npm run build            # bundles src/extension.ts -> dist/extension.js
-npm run package          # -> tythan-code-0.2.0.vsix
-code --install-extension tythan-code-0.2.0.vsix
+npm run package          # -> tythan-code-0.3.0.vsix
+code --install-extension tythan-code-0.3.0.vsix
 ```
 
 Or press `F5` in VS Code with this folder open to launch an Extension
@@ -108,6 +132,7 @@ as a fallback.
 | `tythanCode.compactKeepRounds` | `2` | Turns kept verbatim when compacting |
 | `tythanCode.inlineCompletion.enabled` | `true` | Show inline tab-completions |
 | `tythanCode.inlineCompletion.debounceMs` | `400` | Delay after you stop typing before requesting a completion |
+| `tythanCode.inlineCompletion.model` | _(empty)_ | Dedicated fast model for tab-completion (empty = main chat model) |
 
 Local model context windows default conservatively (8k) since local servers
 commonly run with a much smaller context than the underlying model supports
@@ -121,6 +146,7 @@ All available from the Command Palette (`Cmd/Ctrl+Shift+P`):
 - **Tythan Code: Open Chat** (`Ctrl+Alt+;` / `Cmd+Alt+;`)
 - **Tythan Code: New Chat Session** — clears the conversation
 - **Tythan Code: Stop Generation** — also a Stop button in the chat itself
+- **Tythan Code: Composer (Multi-File Edit)** (`Ctrl+Alt+I` / `Cmd+Alt+I`)
 - **Tythan Code: Edit Selection with AI** (`Ctrl+Alt+K` / `Cmd+Alt+K`)
 - **Tythan Code: Add Selection to Chat** (`Ctrl+Alt+L` / `Cmd+Alt+L`)
 - **Tythan Code: Select Model**
@@ -161,7 +187,7 @@ Said plainly, because it matters more than it would in a marketing page:
   - `npm run build` (esbuild) bundles `dist/extension.js` cleanly.
   - `npm run package` (`vsce package`) produces a real, installable
     `.vsix` with no manifest warnings.
-  - 141 unit tests pass (see [Testing](#testing)) covering every module
+  - 183 unit tests pass (see [Testing](#testing)) covering every module
     under `core/` — the entire agent loop, both provider backends, tool
     execution and workspace confinement, checkpoints/undo, context
     compaction, and the security scanner.
@@ -188,7 +214,7 @@ npm run watch        # esbuild --watch, for iterating with F5
 
 ## Testing
 
-`npm test` runs 141 tests across 8 files, all offline (SDK clients are
+`npm test` runs 183 tests across 12 files, all offline (SDK clients are
 replaced with fakes matching the real `@anthropic-ai/sdk` / `openai` request
 shapes — verified against the installed packages' type definitions, not
 guessed):
@@ -207,8 +233,18 @@ guessed):
   extraction, usage tracking, the stream_options-support probe's narrowed
   error handling, transcript rendering, summarization.
 - `agent.test.ts` — the full tool-execution loop, checkpoint wiring,
-  compaction triggering/failure handling, token-budget capping, and that a
+  compaction triggering/failure handling, token-budget capping, stop/abort
+  semantics (a stopped turn still pairs every tool_use with a tool_result),
+  tool-error containment, disabled tools, rules-file injection, and that a
   disk error saving a checkpoint can't mask a real in-flight exception.
+- `changeset.test.ts` — composer staging: overlay reads/writes/edits, staged
+  content visible to search/list, disk untouched, workspace confinement.
+- `codebaseIndex.test.ts` — identifier tokenization, TF-IDF snippet ranking,
+  file map, `@codebase` mention expansion.
+- `rules.test.ts` — `.tythanrules`/`.cursorrules`/`AGENTS.md` precedence,
+  truncation, empty-file fallthrough.
+- `sessionStore.test.ts` — persistence round-trips, provider-mismatch
+  discard, corruption tolerance, transcript/size caps.
 
 ## Architecture
 
@@ -219,16 +255,22 @@ tythan-code/
 │   ├── core/                     # vscode-independent — fully unit tested
 │   │   ├── agent.ts              # tool-execution loop, checkpoint + compaction wiring
 │   │   ├── tools.ts              # workspace-confined file/shell tools
+│   │   ├── changeset.ts          # OverlayWorkspace: staged edits for composer mode
 │   │   ├── checkpoints.ts        # file-level undo store
+│   │   ├── codebaseIndex.ts      # offline @codebase retrieval (TF-IDF over identifier tokens)
 │   │   ├── compaction.ts         # round splitting, token heuristics
+│   │   ├── rules.ts              # .tythanrules/.cursorrules/AGENTS.md loading
 │   │   ├── security.ts           # regex-based security scanner
+│   │   ├── sessionStore.ts       # persistent chat sessions per workspace
 │   │   ├── config.ts             # provider config, context-window defaults
 │   │   └── providers/            # Backend interface + Anthropic/OpenAI-compatible implementations
 │   └── vscode-integration/       # thin adapters — the only files that import `vscode`
 │       ├── settings.ts           # reads configuration + SecretStorage
 │       ├── approver.ts           # diff editor + modal confirm for mutating tools
-│       ├── chatPanel.ts          # webview chat sidebar (implements AgentSink)
-│       ├── inlineCompletion.ts   # InlineCompletionItemProvider
+│       ├── chatPanel.ts          # webview chat sidebar (implements AgentSink, keeps the transcript)
+│       ├── composer.ts           # multi-file staged-edit flow + per-file review
+│       ├── inlineCompletion.ts   # InlineCompletionItemProvider (+ LRU cache, fast-model support)
+│       ├── inlineEdit.ts         # Ctrl+Alt+K edit-selection flow
 │       └── runTurnSafely.ts      # provider-aware error -> user-facing message
 └── test/
     ├── core/                     # vitest — no vscode dependency, runs anywhere

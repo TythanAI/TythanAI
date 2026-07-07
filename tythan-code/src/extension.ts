@@ -15,12 +15,15 @@ import { CheckpointStore, workspaceStorageKey } from "./core/checkpoints";
 import { formatFindings, scanWorkspace } from "./core/security";
 import { makeBackend } from "./core/providers";
 import type { Backend } from "./core/providers/types";
+import { SessionStore } from "./core/sessionStore";
 import { VscodeToolApprover } from "./vscode-integration/approver";
 import { ChatViewProvider } from "./vscode-integration/chatPanel";
+import { runComposer } from "./vscode-integration/composer";
 import { TythanCodeInlineCompletionProvider } from "./vscode-integration/inlineCompletion";
 import { editSelection } from "./vscode-integration/inlineEdit";
 import {
   currentProviderName,
+  inlineCompletionModel,
   resolveAgentConfig,
   resolveEffort,
   resolveProviderConfig,
@@ -34,6 +37,7 @@ const CONFIG_KEYS_TRIGGERING_REBUILD = [
   "tythanCode.contextWindow",
   "tythanCode.customBaseUrl",
   "tythanCode.maxOutputTokens",
+  "tythanCode.inlineCompletion.model",
 ];
 
 function activeWorkspaceRoot(): string | undefined {
@@ -50,6 +54,8 @@ function requireAgent(agent: Agent | undefined): Agent {
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   let agent: Agent | undefined;
   let backend: Backend | undefined;
+  let completionBackend: Backend | undefined;
+  let sessionStore: SessionStore | undefined;
 
   const chatView = new ChatViewProvider(
     () => requireAgent(agent),
@@ -60,11 +66,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }),
   );
 
+  chatView.onSessionChanged = () => {
+    if (agent && backend && sessionStore) {
+      sessionStore.save(backend.describe(), agent.messages, chatView.getTranscript());
+    }
+  };
+
   async function rebuild(): Promise<void> {
     const root = activeWorkspaceRoot();
     if (!root) {
       agent = undefined;
       backend = undefined;
+      completionBackend = undefined;
+      sessionStore = undefined;
       return;
     }
     // Never let a config/backend problem fail activation or leave `agent`
@@ -75,18 +89,39 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const providerConfig = await resolveProviderConfig(context);
       const agentConfig: AgentConfig = resolveAgentConfig(root);
       backend = makeBackend(providerConfig, { effort: resolveEffort(), maxTokens: agentConfig.maxTokens });
+      // A dedicated (typically smaller/faster) model for tab-completion,
+      // same provider + key. Low effort on purpose: latency over depth.
+      const completionModel = inlineCompletionModel();
+      completionBackend = completionModel
+        ? makeBackend({ ...providerConfig, model: completionModel }, { effort: "low", maxTokens: 512 })
+        : backend;
       const storageDir = path.join(context.globalStorageUri.fsPath, "checkpoints", workspaceStorageKey(root));
       const checkpointStore = new CheckpointStore(root, storageDir);
       agent = new Agent(agentConfig, chatView, new VscodeToolApprover(), backend, checkpointStore);
+      sessionStore = new SessionStore(
+        path.join(context.globalStorageUri.fsPath, "sessions", `${workspaceStorageKey(root)}.json`),
+      );
     } catch (err) {
       void vscode.window.showErrorMessage(`Tythan Code: ${(err as Error).message}`);
       agent = undefined;
       backend = undefined;
+      completionBackend = undefined;
+      sessionStore = undefined;
     }
     chatView.refreshBanner();
   }
 
   await rebuild();
+
+  // Restore the previous session for this workspace (provider+model must
+  // match — provider-native histories aren't interchangeable).
+  if (agent && backend && sessionStore) {
+    const restored = sessionStore.load(backend.describe());
+    if (restored && (restored.messages.length > 0 || restored.transcript.length > 0)) {
+      agent.messages = restored.messages;
+      chatView.setTranscript(restored.transcript);
+    }
+  }
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, chatView),
@@ -113,6 +148,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     vscode.commands.registerCommand("tythanCode.editSelection", async () => {
       await editSelection(() => backend);
+    }),
+
+    vscode.commands.registerCommand("tythanCode.composer", async () => {
+      await runComposer({ getAgent: () => requireAgent(agent), getBackend: () => backend, chatView });
     }),
 
     vscode.commands.registerCommand("tythanCode.addSelectionToChat", async () => {
@@ -285,7 +324,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
     vscode.languages.registerInlineCompletionItemProvider(
       { pattern: "**" },
-      new TythanCodeInlineCompletionProvider(() => backend),
+      new TythanCodeInlineCompletionProvider(() => completionBackend),
     ),
   );
 }

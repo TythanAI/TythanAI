@@ -67,6 +67,11 @@ export interface AgentConfig {
   yolo: boolean;
   checkpointsEnabled: boolean;
   compactKeepRounds: number;
+  /** Extra text appended to the system prompt (e.g. composer-mode guidance). */
+  systemPromptExtra?: string;
+  /** Tool names neither advertised to the model nor executable (e.g.
+   * run_command in composer mode, where changes are staged, not applied). */
+  disabledTools?: string[];
 }
 
 export function defaultAgentConfig(workspaceRoot: string, overrides: Partial<AgentConfig> = {}): AgentConfig {
