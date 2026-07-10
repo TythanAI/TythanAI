@@ -1,0 +1,5 @@
+# Зависимости Telegram-бота-магазина (отдельно от основного проекта TythanAI).
+# Установка:  pip install -r requirements.txt
+aiogram>=3.13,<4
+aiosqlite>=0.20
+python-dotenv>=1.0

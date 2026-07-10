@@ -37,3 +37,6 @@ ghost_reports/
 *.local
 .env
 .env.*
+# ...but keep example templates (they contain no secrets)
+!.env.example
+!*.env.example

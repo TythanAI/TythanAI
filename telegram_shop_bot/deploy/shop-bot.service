@@ -1,0 +1,32 @@
+# systemd-юнит для запуска бота-магазина 24/7.
+#
+# Установка:
+#   1) отредактируй User, WorkingDirectory и ExecStart под свой сервер
+#   2) sudo cp deploy/shop-bot.service /etc/systemd/system/shop-bot.service
+#   3) sudo systemctl daemon-reload
+#   4) sudo systemctl enable --now shop-bot
+#
+# Логи:   journalctl -u shop-bot -f
+# Статус: systemctl status shop-bot
+
+[Unit]
+Description=Telegram Shop Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Пользователь, от которого запускать (не root желательно):
+User=ubuntu
+# Полный путь к папке с ботом:
+WorkingDirectory=/home/ubuntu/telegram_shop_bot
+# Путь к python и run.py. Если используешь venv — укажи python из venv:
+#   ExecStart=/home/ubuntu/telegram_shop_bot/.venv/bin/python run.py
+ExecStart=/usr/bin/python3 run.py
+Restart=always
+RestartSec=5
+# Файл с настройками (альтернатива — держать .env в WorkingDirectory):
+EnvironmentFile=-/home/ubuntu/telegram_shop_bot/.env
+
+[Install]
+WantedBy=multi-user.target
