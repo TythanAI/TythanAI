@@ -1,0 +1,6 @@
+# Зависимости CS2-снайпера. Установка: pip install -r requirements.txt
+aiogram>=3.13,<4
+aiosqlite>=0.20
+python-dotenv>=1.0
+aiohttp>=3.9
+pynacl>=1.5      # подпись запросов DMarket (Ed25519); нужно только для авто-скупки

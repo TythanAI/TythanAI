@@ -74,7 +74,7 @@ py-modules = ["tythanai_community_cli"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["tests*", "docs*", "landing*", "telegram_shop_bot*"]
+exclude = ["tests*", "docs*", "landing*", "telegram_shop_bot*", "cs2_skin_sniper*"]
 
 [tool.setuptools.package-data]
 "*" = ["rules/**/*.yaml", "rules/**/*.yml", "rules/**/*.json"]
