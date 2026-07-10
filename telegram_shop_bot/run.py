@@ -19,6 +19,8 @@ from aiogram.types import BotCommand
 from bot.config import Config
 from bot.database import Database
 from bot.handlers import admin, payments, user
+from bot.services.backup import backup_loop
+from bot.services.ton import TonClient, ton_watch_loop
 
 logger = logging.getLogger("bot")
 
@@ -50,12 +52,25 @@ async def main() -> None:
         ]
     )
 
+    # Фоновые задачи: авто-проверка TON-оплат и бэкапы базы.
+    ton_client = TonClient(config.ton_api_url, config.ton_api_key) if config.ton_enabled else None
+    background: list[asyncio.Task] = []
+    if ton_client is not None:
+        background.append(asyncio.create_task(ton_watch_loop(bot, config, db, ton_client)))
+    if config.backup_enabled:
+        background.append(asyncio.create_task(backup_loop(bot, config, db)))
+
     me = await bot.get_me()
-    logger.info("Бот @%s запущен. Валюта: %s. Админы: %s", me.username, config.currency, config.admin_ids)
+    logger.info(
+        "Бот @%s запущен. Способы оплаты: %s. Валюта: %s. Админы: %s",
+        me.username, ", ".join(config.enabled_methods), config.currency, config.admin_ids,
+    )
 
     try:
-        await dp.start_polling(bot, db=db, config=config)
+        await dp.start_polling(bot, db=db, config=config, ton_client=ton_client)
     finally:
+        for task in background:
+            task.cancel()
         await db.close()
         await bot.session.close()
         logger.info("Бот остановлен")

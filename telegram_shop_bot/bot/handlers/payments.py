@@ -1,13 +1,13 @@
-"""Оплата: три способа — Telegram Stars, провайдер (карты), ручное подтверждение.
+"""Оплата: выбор способа, счёт (Stars/провайдер), ручная оплата, оплата в TON.
 
-Мгновенная выдача (stars/provider) — сразу после успешной оплаты.
-Ручная оплата (manual) — покупатель платит по реквизитам, админ подтверждает,
-затем бот выдаёт товар автоматически.
+Мгновенная выдача — сразу после оплаты (Stars/провайдер) или автоматически после
+подтверждения перевода (TON/ручная).
 """
 
 from __future__ import annotations
 
 import logging
+import secrets
 
 from aiogram import Bot, F, Router
 from aiogram.fsm.context import FSMContext
@@ -17,8 +17,9 @@ from .. import keyboards as kb
 from .. import texts
 from ..config import Config
 from ..database import Database
-from ..keyboards import PayCB, ProductCB
-from ..utils import active_promo, apply_discount
+from ..keyboards import PayCB, PayMethodCB, ProductCB, TonCheckCB
+from ..services.ton import check_ton_order, format_ton, ton_nano_for
+from ..utils import active_promo, apply_discount, render
 
 logger = logging.getLogger(__name__)
 router = Router(name="payments")
@@ -27,7 +28,6 @@ _PREFIX = "buy:"
 
 
 def _invoice_amount(price: int, config: Config) -> int:
-    # Stars (XTR): сумма в звёздах как есть. Обычная валюта: в минимальных единицах.
     return price if config.is_stars else price * 100
 
 
@@ -51,37 +51,44 @@ async def _notify_admins(bot: Bot, config: Config, text: str, markup=None) -> No
             logger.warning("Не удалось уведомить админа %s", admin_id)
 
 
-@router.callback_query(ProductCB.filter(F.action == "buy"))
-async def cb_buy(query: CallbackQuery, callback_data: ProductCB, db: Database,
-                 config: Config, state: FSMContext) -> None:
+async def _begin_payment(query: CallbackQuery, method: str, product, back_cat: int,
+                         db: Database, config: Config, state: FSMContext) -> None:
+    """Запустить оплату выбранным способом (счёт / ручная / TON)."""
     if query.from_user is None or query.message is None:
         return
-    product = await db.get_product(callback_data.product_id)
-    if product is None or not product["is_active"]:
-        await query.answer("Товар недоступен", show_alert=True)
-        return
-    if await db.available_count(product["id"]) <= 0:
-        await query.answer("Нет в наличии", show_alert=True)
-        return
-
     promo = await active_promo(state, db)
     promo_code = promo["code"] if promo else None
     price = apply_discount(product["price"], promo)
+    uid = query.from_user.id
 
-    if config.is_manual:
-        reserved = await db.reserve_one(
-            product, query.from_user.id, price, product["price"], "manual", promo_code
-        )
+    if method == "manual":
+        reserved = await db.reserve_one(product, uid, price, product["price"], "manual", promo_code)
         if reserved is None:
             await query.answer("Нет в наличии", show_alert=True)
             return
-        await state.update_data(promo_code=None)  # промокод учтён в заказе
+        await state.update_data(promo_code=None)
         await query.message.answer(
             texts.manual_invoice(product["title"], price, config.currency,
                                   config.payment_details, reserved["order_id"]),
             reply_markup=kb.manual_pay_kb(reserved["order_id"]),
         )
-        await query.answer()
+        return
+
+    if method == "ton":
+        memo = secrets.token_hex(4)
+        nano = ton_nano_for(price, config.ton_rate)
+        reserved = await db.reserve_one(
+            product, uid, price, product["price"], "ton", promo_code, memo=memo, ton_nano=nano
+        )
+        if reserved is None:
+            await query.answer("Нет в наличии", show_alert=True)
+            return
+        await state.update_data(promo_code=None)
+        await query.message.answer(
+            texts.ton_invoice(product["title"], format_ton(nano), config.ton_wallet, memo,
+                              reserved["order_id"], price, config.currency),
+            reply_markup=kb.ton_pay_kb(reserved["order_id"]),
+        )
         return
 
     # stars / provider — счёт Telegram
@@ -95,6 +102,44 @@ async def cb_buy(query: CallbackQuery, callback_data: ProductCB, db: Database,
         prices=[LabeledPrice(label=title, amount=_invoice_amount(price, config))],
         provider_token=config.provider_token,
     )
+
+
+@router.callback_query(ProductCB.filter(F.action == "buy"))
+async def cb_buy(query: CallbackQuery, callback_data: ProductCB, db: Database,
+                 config: Config, state: FSMContext) -> None:
+    product = await db.get_product(callback_data.product_id)
+    if product is None or not product["is_active"]:
+        await query.answer("Товар недоступен", show_alert=True)
+        return
+    if await db.available_count(product["id"]) <= 0:
+        await query.answer("Нет в наличии", show_alert=True)
+        return
+
+    methods = config.enabled_methods
+    if len(methods) == 1:
+        await _begin_payment(query, methods[0], product, callback_data.back, db, config, state)
+    else:
+        await render(
+            query, texts.choose_payment_method(),
+            kb.payment_choice(product["id"], methods, callback_data.back),
+        )
+    await query.answer()
+
+
+@router.callback_query(PayMethodCB.filter())
+async def cb_pay_method(query: CallbackQuery, callback_data: PayMethodCB, db: Database,
+                        config: Config, state: FSMContext) -> None:
+    if callback_data.method not in config.enabled_methods:
+        await query.answer("Способ недоступен", show_alert=True)
+        return
+    product = await db.get_product(callback_data.product_id)
+    if product is None or not product["is_active"]:
+        await query.answer("Товар недоступен", show_alert=True)
+        return
+    if await db.available_count(product["id"]) <= 0:
+        await query.answer("Нет в наличии", show_alert=True)
+        return
+    await _begin_payment(query, callback_data.method, product, callback_data.back, db, config, state)
     await query.answer()
 
 
@@ -180,3 +225,23 @@ async def cb_manual_cancel(query: CallbackQuery, callback_data: PayCB, db: Datab
     if query.message:
         await query.message.edit_text(texts.manual_cancelled())
     await query.answer()
+
+
+# ── Оплата в TON: проверка по кнопке ──────────────────────────────────
+@router.callback_query(TonCheckCB.filter())
+async def cb_ton_check(query: CallbackQuery, callback_data: TonCheckCB, bot: Bot,
+                       db: Database, config: Config, ton_client=None) -> None:
+    order = await db.get_order(callback_data.order_id)
+    if order is None or order["status"] != "pending" or query.from_user is None \
+            or order["user_id"] != query.from_user.id:
+        await query.answer("Заказ не найден или уже обработан", show_alert=True)
+        return
+    if ton_client is None:
+        await query.answer("Проверка TON сейчас недоступна", show_alert=True)
+        return
+    if await check_ton_order(bot, config, db, ton_client, order):
+        if query.message:
+            await query.message.edit_text("✅ Оплата получена! Товар отправлен вам в чат.")
+        await query.answer("Оплачено!")
+    else:
+        await query.answer(texts.ton_not_found(), show_alert=True)

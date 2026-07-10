@@ -33,6 +33,16 @@ class PayCB(CallbackData, prefix="pay"):
     order_id: int
 
 
+class PayMethodCB(CallbackData, prefix="pm"):
+    method: str  # stars, provider, manual, ton
+    product_id: int
+    back: int = 0
+
+
+class TonCheckCB(CallbackData, prefix="tc"):
+    order_id: int
+
+
 class AdminCB(CallbackData, prefix="a"):
     action: str  # panel, add_product, add_stock, list, stats, cats, promos, add_promo, broadcast, reviews
 
@@ -119,9 +129,29 @@ def rating_kb(product_id: int) -> InlineKeyboardMarkup:
     return kb.as_markup()
 
 
+def payment_choice(product_id: int, methods: list[str], back_cat: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for m in methods:
+        kb.button(
+            text=texts.method_label(m),
+            callback_data=PayMethodCB(method=m, product_id=product_id, back=back_cat),
+        )
+    kb.button(text="⬅️ Назад", callback_data=ProductCB(action="view", product_id=product_id, back=back_cat))
+    kb.adjust(1)
+    return kb.as_markup()
+
+
 def manual_pay_kb(order_id: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.button(text="✅ Я оплатил(а)", callback_data=PayCB(action="paid", order_id=order_id))
+    kb.button(text="❌ Отменить заказ", callback_data=PayCB(action="cancel", order_id=order_id))
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def ton_pay_kb(order_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🔄 Я оплатил — проверить", callback_data=TonCheckCB(order_id=order_id))
     kb.button(text="❌ Отменить заказ", callback_data=PayCB(action="cancel", order_id=order_id))
     kb.adjust(1)
     return kb.as_markup()
@@ -152,8 +182,9 @@ def admin_panel() -> InlineKeyboardMarkup:
     kb.button(text="📣 Рассылка", callback_data=AdminCB(action="broadcast"))
     kb.button(text="⭐️ Отзывы", callback_data=AdminCB(action="reviews"))
     kb.button(text="📊 Статистика", callback_data=AdminCB(action="stats"))
+    kb.button(text="💾 Бэкап базы", callback_data=AdminCB(action="backup"))
     kb.button(text="⬅️ В меню", callback_data=MenuCB(action="home"))
-    kb.adjust(2, 2, 2, 1, 1)
+    kb.adjust(2, 2, 2, 2, 1)
     return kb.as_markup()
 
 

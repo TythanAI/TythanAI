@@ -24,6 +24,8 @@ from ..keyboards import (
     AdminPromoCB,
     MenuCB,
 )
+from ..services.backup import send_backup
+from ..services.orders import approve_and_deliver
 from ..states import AddCategory, AddProduct, AddPromo, AddStock, Broadcast
 from ..utils import render
 
@@ -58,6 +60,23 @@ async def cb_admin(query: CallbackQuery, state: FSMContext) -> None:
 async def cb_stats(query: CallbackQuery, db: Database, config: Config) -> None:
     await render(query, texts.admin_stats(await db.stats(), config.currency), kb.admin_back())
     await query.answer()
+
+
+@router.callback_query(AdminCB.filter(F.action == "backup"))
+async def cb_backup(query: CallbackQuery, bot: Bot, db: Database, config: Config) -> None:
+    if query.from_user is None:
+        return
+    # если чат для бэкапов не задан — присылаем файл самому админу
+    to_self = config.backup_chat_id is None
+    chat = query.from_user.id if to_self else config.backup_chat_id
+    await query.answer("Делаю бэкап…")
+    try:
+        ok = await send_backup(bot, config, db, chat_id=chat)
+        text = texts.backup_ok(to_self) if ok else texts.backup_failed()
+    except Exception:  # noqa: BLE001
+        logger.exception("Ошибка бэкапа")
+        text = texts.backup_failed()
+    await render(query, text, kb.admin_back())
 
 
 # ── добавление товара ─────────────────────────────────────────────────
@@ -408,19 +427,13 @@ async def cb_admin_reviews(query: CallbackQuery, db: Database) -> None:
 # ── подтверждение ручной оплаты ───────────────────────────────────────
 @router.callback_query(AdminOrderCB.filter(F.action == "approve"))
 async def cb_order_approve(query: CallbackQuery, callback_data: AdminOrderCB, bot: Bot,
-                           db: Database) -> None:
-    result = await db.approve_order(callback_data.order_id)
+                           db: Database, config: Config) -> None:
+    result = await approve_and_deliver(bot, config, db, callback_data.order_id)
     if result is None:
         await query.answer("Заказ уже обработан или наличие пропало", show_alert=True)
         if query.message:
             await query.message.edit_text("⚠️ Заказ уже обработан.")
         return
-    if result["promo_code"]:
-        await db.use_promocode(result["promo_code"])
-    try:
-        await bot.send_message(result["user_id"], texts.delivery(result["title"], result["payload"]))
-    except Exception:  # noqa: BLE001
-        logger.exception("Не удалось выдать товар покупателю %s", result["user_id"])
     if query.message:
         await query.message.edit_text(f"✅ Заказ #{result['order_id']} подтверждён, товар выдан.")
     await query.answer("Подтверждено")

@@ -42,6 +42,18 @@ def _parse_admin_ids(raw: str) -> list[int]:
     return ids
 
 
+def _parse_int(raw: str, default: int = 0) -> int:
+    raw = (raw or "").strip()
+    return int(raw) if raw.lstrip("-").isdigit() else default
+
+
+def _parse_float(raw: str, default: float = 0.0) -> float:
+    try:
+        return float((raw or "").strip().replace(",", "."))
+    except ValueError:
+        return default
+
+
 @dataclass(frozen=True)
 class Config:
     """Все настройки бота в одном месте."""
@@ -55,6 +67,14 @@ class Config:
     payment_details: str
     support_contact: str
     db_path: Path
+    # TON (крипто-оплата, опционально)
+    ton_wallet: str
+    ton_rate: float          # сколько единиц цены (напр. рублей) в 1 TON
+    ton_api_url: str
+    ton_api_key: str
+    # Бэкапы в Telegram-чат (опционально)
+    backup_chat_id: int | None
+    backup_interval_hours: int
 
     @property
     def is_stars(self) -> bool:
@@ -67,6 +87,22 @@ class Config:
     @property
     def is_provider(self) -> bool:
         return self.payment_method == "provider"
+
+    @property
+    def ton_enabled(self) -> bool:
+        return bool(self.ton_wallet) and self.ton_rate > 0
+
+    @property
+    def backup_enabled(self) -> bool:
+        return self.backup_chat_id is not None and self.backup_interval_hours > 0
+
+    @property
+    def enabled_methods(self) -> list[str]:
+        """Способы оплаты, доступные покупателю (основной + TON, если включён)."""
+        methods = [self.payment_method]
+        if self.ton_enabled:
+            methods.append("ton")
+        return methods
 
     @property
     def symbol(self) -> str:
@@ -128,6 +164,17 @@ class Config:
         if not db_path.is_absolute():
             db_path = BASE_DIR / db_path
 
+        ton_wallet = os.getenv("TON_WALLET", "").strip()
+        ton_rate = _parse_float(os.getenv("TON_RATE", ""))
+        if ton_wallet and ton_rate <= 0:
+            raise RuntimeError(
+                "TON_WALLET задан, но TON_RATE не указан. Впиши TON_RATE — сколько "
+                "единиц твоей цены равно 1 TON (например, 1 TON = 500 ₽ → TON_RATE=500)."
+            )
+
+        backup_chat_raw = os.getenv("BACKUP_CHAT_ID", "").strip()
+        backup_chat_id = int(backup_chat_raw) if backup_chat_raw.lstrip("-").isdigit() else None
+
         return cls(
             bot_token=token,
             admin_ids=admin_ids,
@@ -138,4 +185,11 @@ class Config:
             payment_details=payment_details,
             support_contact=os.getenv("SUPPORT_CONTACT", "").strip(),
             db_path=db_path,
+            ton_wallet=ton_wallet,
+            ton_rate=ton_rate,
+            ton_api_url=os.getenv("TON_API_URL", "https://toncenter.com/api/v2").strip().rstrip("/")
+            or "https://toncenter.com/api/v2",
+            ton_api_key=os.getenv("TON_API_KEY", "").strip(),
+            backup_chat_id=backup_chat_id,
+            backup_interval_hours=_parse_int(os.getenv("BACKUP_INTERVAL_HOURS", "0")),
         )

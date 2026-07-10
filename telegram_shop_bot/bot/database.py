@@ -77,6 +77,8 @@ CREATE TABLE IF NOT EXISTS orders (
     promo_code     TEXT,
     charge_id      TEXT,
     status         TEXT    NOT NULL DEFAULT 'paid',
+    memo           TEXT,
+    ton_nano       INTEGER,
     created_at     INTEGER NOT NULL,
     paid_at        INTEGER
 );
@@ -119,6 +121,8 @@ _MIGRATIONS: list[tuple[str, str, str]] = [
     ("orders", "method", "ALTER TABLE orders ADD COLUMN method TEXT NOT NULL DEFAULT ''"),
     ("orders", "promo_code", "ALTER TABLE orders ADD COLUMN promo_code TEXT"),
     ("orders", "paid_at", "ALTER TABLE orders ADD COLUMN paid_at INTEGER"),
+    ("orders", "memo", "ALTER TABLE orders ADD COLUMN memo TEXT"),
+    ("orders", "ton_nano", "ALTER TABLE orders ADD COLUMN ton_nano INTEGER"),
 ]
 
 
@@ -316,15 +320,16 @@ class Database:
     async def _create_order(
         self, product: aiosqlite.Row, user_id: int, price: int, original_price: int,
         method: str, promo_code: str | None, charge_id: str | None, status: str,
+        memo: str | None = None, ton_nano: int | None = None,
     ) -> int:
         now = int(time.time())
         paid_at = now if status == "paid" else None
         cur = await self.conn.execute(
             "INSERT INTO orders(user_id, product_id, stock_id, title, price, original_price, "
-            "currency, method, promo_code, charge_id, status, created_at, paid_at) "
-            "VALUES(?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "currency, method, promo_code, charge_id, status, memo, ton_nano, created_at, paid_at) "
+            "VALUES(?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (user_id, product["id"], product["title"], price, original_price,
-             self.currency, method, promo_code, charge_id, status, now, paid_at),
+             self.currency, method, promo_code, charge_id, status, memo, ton_nano, now, paid_at),
         )
         return int(cur.lastrowid)
 
@@ -361,9 +366,10 @@ class Database:
     async def reserve_one(
         self, product: aiosqlite.Row, user_id: int, price: int, original_price: int,
         method: str, promo_code: str | None = None,
+        memo: str | None = None, ton_nano: int | None = None,
     ) -> Optional[dict[str, Any]]:
-        """Ручная оплата: создать заказ pending и зарезервировать под него единицу.
-        None — если наличие кончилось. Резерв держится до подтверждения/отклонения.
+        """Ручная/крипто-оплата: создать заказ pending и зарезервировать под него
+        единицу. None — если наличие кончилось. Резерв держится до подтверждения.
         """
         async with self._stock_lock:
             cur = await self.conn.execute(
@@ -374,7 +380,8 @@ class Database:
             if item is None:
                 return None
             order_id = await self._create_order(
-                product, user_id, price, original_price, method, promo_code, None, "pending"
+                product, user_id, price, original_price, method, promo_code, None, "pending",
+                memo=memo, ton_nano=ton_nano,
             )
             now = int(time.time())
             await self.conn.execute(
@@ -437,6 +444,12 @@ class Database:
     async def get_order(self, order_id: int) -> Optional[aiosqlite.Row]:
         cur = await self.conn.execute("SELECT * FROM orders WHERE id = ?", (order_id,))
         return await cur.fetchone()
+
+    async def list_pending_ton_orders(self) -> list[aiosqlite.Row]:
+        cur = await self.conn.execute(
+            "SELECT * FROM orders WHERE status = 'pending' AND method = 'ton' ORDER BY id"
+        )
+        return list(await cur.fetchall())
 
     async def get_user_orders(self, user_id: int, limit: int = 20) -> list[aiosqlite.Row]:
         cur = await self.conn.execute(

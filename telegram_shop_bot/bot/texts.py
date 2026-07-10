@@ -156,6 +156,53 @@ def review_thanks() -> str:
     return "🙏 Спасибо за отзыв!"
 
 
+# ── Выбор способа оплаты ──────────────────────────────────────────────
+def method_label(method: str) -> str:
+    return {
+        "stars": "⭐️ Telegram Stars",
+        "provider": "🏦 Банковская карта",
+        "manual": "💳 Перевод на карту",
+        "ton": "💎 Криптовалюта TON",
+    }.get(method, method)
+
+
+def choose_payment_method() -> str:
+    return "💳 <b>Способ оплаты</b>\n\nВыбери, как удобнее оплатить:"
+
+
+# ── Оплата в TON ──────────────────────────────────────────────────────
+def ton_invoice(title: str, ton_str: str, wallet: str, memo: str,
+                order_id: int, price: int, currency: str) -> str:
+    return (
+        f"💎 <b>Оплата в TON · заказ #{order_id}</b>\n"
+        f"Товар: <b>{escape(title)}</b>\n"
+        f"Цена: {price_str(price, currency)}\n\n"
+        f"1️⃣ Переведи <b>ровно {ton_str} TON</b> на кошелёк:\n"
+        f"<code>{escape(wallet)}</code>\n\n"
+        f"2️⃣ ОБЯЗАТЕЛЬНО укажи комментарий (memo) к переводу:\n"
+        f"<code>{escape(memo)}</code>\n\n"
+        "❗️ Без этого комментария платёж не засчитается. Товар зарезервирован за тобой.\n"
+        "3️⃣ После перевода нажми «🔄 Я оплатил — проверить» (обычно 10–40 секунд)."
+    )
+
+
+def ton_not_found() -> str:
+    return (
+        "⏳ Оплата пока не найдена.\n"
+        "Если только что перевёл — подожди 20–40 секунд и нажми ещё раз. "
+        "Убедись, что указал комментарий и точную сумму."
+    )
+
+
+# ── Бэкапы (админ) ────────────────────────────────────────────────────
+def backup_ok(to_self: bool) -> str:
+    return "✅ Бэкап отправлен тебе в этот чат." if to_self else "✅ Бэкап отправлен в чат бэкапов."
+
+
+def backup_failed() -> str:
+    return "⚠️ Не удалось сделать бэкап. Проверь логи и права бота в чате бэкапов."
+
+
 # ── Ручная оплата ─────────────────────────────────────────────────────
 def manual_invoice(title: str, price: int, currency: str, details: str, order_id: int) -> str:
     return (
