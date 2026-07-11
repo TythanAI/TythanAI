@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="TythanAI — Telegram-боты и сайты для малого бизнеса за 1–2 дня. Демо бесплатно, оплата после.">
+<title>TythanAI — боты и сайты для бизнеса</title>
+<script>
+const CONFIG = {
+  // ============================ НАСТРОЙКА ============================
+  email: "danilgg2008@gmail.com",
+  telegram: "",        // впиши свой ник без @ — появится кнопка Telegram
+  demoBot: "",         // ник демо-бота без @ — оживёт кнопка «Попробовать демо»
+  // ===================================================================
+};
+</script>
+<style>
+  :root {
+    --bg: #0a0c10; --panel: #12151c; --panel2: #171b24; --line: #232936;
+    --text: #e9ecf2; --muted: #98a0b3; --acc: #5b7cfa; --acc2: #34d399;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.65; overflow-x: hidden;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; padding: 0 20px; }
+  a { color: inherit; }
+
+  /* ---------- шапка ---------- */
+  nav {
+    position: sticky; top: 0; z-index: 50; backdrop-filter: blur(14px);
+    background: rgba(10,12,16,.75); border-bottom: 1px solid var(--line);
+  }
+  nav .wrap { display: flex; align-items: center; gap: 22px; height: 60px; }
+  .logo { font-weight: 800; font-size: 1.1rem; text-decoration: none; }
+  .logo b { background: linear-gradient(90deg, var(--acc), var(--acc2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  nav .links { margin-left: auto; display: flex; gap: 18px; }
+  nav .links a { text-decoration: none; color: var(--muted); font-size: .92rem; transition: color .15s; }
+  nav .links a:hover { color: var(--text); }
+  @media (max-width: 640px) { nav .links a:not(.nav-cta) { display: none; } }
+  .nav-cta { color: var(--acc) !important; font-weight: 600; }
+
+  /* ---------- герой ---------- */
+  .hero { position: relative; padding: 110px 0 100px; text-align: center; }
+  #fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  .hero .wrap { position: relative; }
+  .tag {
+    display: inline-block; font-size: .8rem; color: var(--acc2); border: 1px solid rgba(52,211,153,.35);
+    background: rgba(52,211,153,.08); border-radius: 100px; padding: 5px 14px; margin-bottom: 22px;
+  }
+  h1 { font-size: clamp(2rem, 5.5vw, 3.4rem); line-height: 1.15; margin-bottom: 18px; }
+  h1 span { background: linear-gradient(90deg, var(--acc), var(--acc2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero p { color: var(--muted); max-width: 580px; margin: 0 auto 34px; font-size: 1.12rem; }
+
+  .btn {
+    display: inline-block; padding: 14px 30px; border-radius: 12px; text-decoration: none;
+    font-weight: 650; margin: 5px; transition: transform .15s, box-shadow .15s, opacity .15s; cursor: pointer; border: 0; font-size: 1rem;
+  }
+  .btn:hover { transform: translateY(-2px); }
+  .btn-p { background: linear-gradient(90deg, var(--acc), #7c5bfa); color: #fff; box-shadow: 0 8px 26px rgba(91,124,250,.35); }
+  .btn-g { background: var(--panel2); color: var(--text); border: 1px solid var(--line); }
+
+  /* ---------- секции ---------- */
+  section { padding: 78px 0; }
+  h2 { font-size: clamp(1.5rem, 3.5vw, 2.1rem); text-align: center; margin-bottom: 12px; }
+  .sub { text-align: center; color: var(--muted); margin-bottom: 44px; }
+
+  .reveal { opacity: 0; transform: translateY(22px); transition: opacity .6s, transform .6s; }
+  .reveal.on { opacity: 1; transform: none; }
+
+  /* ---------- продукты ---------- */
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+  .card {
+    background: linear-gradient(180deg, var(--panel2), var(--panel)); border: 1px solid var(--line);
+    border-radius: 16px; padding: 28px; display: flex; flex-direction: column; position: relative;
+    transition: transform .18s, border-color .18s;
+  }
+  .card:hover { transform: translateY(-4px); border-color: rgba(91,124,250,.5); }
+  .card .ic { font-size: 2rem; margin-bottom: 14px; }
+  .card h3 { margin-bottom: 10px; font-size: 1.15rem; }
+  .card p { color: var(--muted); font-size: .95rem; flex: 1; }
+  .card .price { margin: 18px 0 4px; font-size: 1.3rem; font-weight: 800; color: var(--acc2); }
+  .card .term { color: #6b7280; font-size: .84rem; margin-bottom: 16px; }
+  .hit { position: absolute; top: 16px; right: 16px; font-size: .72rem; background: rgba(91,124,250,.15); color: var(--acc); padding: 3px 10px; border-radius: 100px; }
+
+  /* ---------- шаги ---------- */
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; counter-reset: s; }
+  .step { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 24px; counter-increment: s; }
+  .step::before {
+    content: "0" counter(s); font-weight: 800; font-size: 1.5rem; display: block; margin-bottom: 10px;
+    background: linear-gradient(90deg, var(--acc), var(--acc2)); -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .step b { display: block; margin-bottom: 6px; }
+  .step span { color: var(--muted); font-size: .92rem; }
+
+  /* ---------- FAQ ---------- */
+  .faq { max-width: 680px; margin: 0 auto; }
+  .faq details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+  .faq summary { cursor: pointer; padding: 16px 20px; font-weight: 600; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  .faq summary::after { content: "+"; color: var(--acc); font-size: 1.3rem; transition: transform .2s; }
+  .faq details[open] summary::after { transform: rotate(45deg); }
+  .faq .a { padding: 0 20px 16px; color: var(--muted); font-size: .95rem; }
+
+  /* ---------- контакты ---------- */
+  .contact { text-align: center; padding-bottom: 100px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 26px; }
+
+  footer { border-top: 1px solid var(--line); color: #6b7280; text-align: center; padding: 26px 0; font-size: .85rem; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="logo" href="#top"><b>Tythan</b>AI</a>
+    <div class="links">
+      <a href="#products">Продукты</a>
+      <a href="#how">Как работаем</a>
+      <a href="#faq">Вопросы</a>
+      <a class="nav-cta" href="#contact">Заказать</a>
+    </div>
+  </div>
+</nav>
+
+<div class="hero" id="top">
+  <canvas id="fx"></canvas>
+  <div class="wrap">
+    <div class="tag">● Свободен для заказов</div>
+    <h1>Боты и сайты для бизнеса —<br><span>за 1–2 дня, с демо до оплаты</span></h1>
+    <p>Telegram-бот записывает ваших клиентов и собирает заявки круглосуточно.
+       Сайт-визитка продаёт, пока вы работаете. Никаких ежемесячных платежей за хостинг.</p>
+    <a class="btn btn-p" href="#products">Смотреть продукты и цены</a>
+    <a class="btn btn-g" id="demo-btn" href="#contact">Попробовать живое демо</a>
+  </div>
+</div>
+
+<section id="products">
+  <div class="wrap">
+    <h2 class="reveal">Продукты и цены</h2>
+    <p class="sub reveal">Фиксированная цена, разовая оплата. Демо бесплатно — платите, только если понравилось.</p>
+    <div class="cards">
+      <div class="card reveal">
+        <div class="ic">📥</div>
+        <h3>Бот приёма заявок</h3>
+        <p>Клиент пишет боту — заявка с именем и телефоном мгновенно приходит вам в Telegram. Ни один клиент не теряется, даже когда вы заняты.</p>
+        <div class="price">от 1 500 ₽</div>
+        <div class="term">готов за 1 день · поддержка неделю бесплатно</div>
+        <a class="btn btn-p order" data-p="Бот приёма заявок" href="#contact">Заказать бота заявок</a>
+      </div>
+      <div class="card reveal">
+        <span class="hit">хит</span>
+        <div class="ic">📅</div>
+        <h3>Бот онлайн-записи</h3>
+        <p>Клиенты сами выбирают услугу, день и свободное время — двойная запись невозможна. Все записи приходят вам и видны одной командой.</p>
+        <div class="price">от 3 000 ₽</div>
+        <div class="term">готов за 1–2 дня · поддержка неделю бесплатно</div>
+        <a class="btn btn-p order" data-p="Бот онлайн-записи" href="#contact">Заказать бота записи</a>
+      </div>
+      <div class="card reveal">
+        <div class="ic">🌐</div>
+        <h3>Сайт-визитка</h3>
+        <p>Современный сайт с услугами, ценами и кнопками «Позвонить» и «Написать». Мгновенно открывается на телефоне, хостинг бесплатный.</p>
+        <div class="price">от 2 000 ₽</div>
+        <div class="term">готов за 1 день · правки входят в цену</div>
+        <a class="btn btn-p order" data-p="Сайт-визитка" href="#contact">Заказать сайт</a>
+      </div>
+      <div class="card reveal">
+        <div class="ic">🎁</div>
+        <h3>Комбо: бот + сайт</h3>
+        <p>Сайт рассказывает о вас, бот записывает клиентов. Полный комплект для запуска онлайн-присутствия со скидкой за пакет.</p>
+        <div class="price">от 4 000 ₽</div>
+        <div class="term">готов за 2–3 дня · выгоднее на ~1 500 ₽</div>
+        <a class="btn btn-p order" data-p="Комбо: бот + сайт" href="#contact">Заказать комбо</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2 class="reveal">Как проходит работа</h2>
+    <p class="sub reveal">Прозрачно и без рисков для вас.</p>
+    <div class="steps">
+      <div class="step reveal"><b>Вы пишете мне</b><span>Пара слов о вашем бизнесе — почта или Telegram, как удобно.</span></div>
+      <div class="step reveal"><b>Бесплатное демо</b><span>За день настраиваю пример под вас. Не понравилось — ничего не платите.</span></div>
+      <div class="step reveal"><b>Предоплата 50%</b><span>Запускаю, настраиваю под ваши услуги и график, даю простую инструкцию.</span></div>
+      <div class="step reveal"><b>Сдача и поддержка</b><span>Остаток после сдачи. Неделя поддержки — бесплатно.</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2 class="reveal">Частые вопросы</h2>
+    <p class="sub reveal">Коротко о том, что спрашивают чаще всего.</p>
+    <div class="faq reveal">
+      <details>
+        <summary>Мне нужно что-то устанавливать или в этом разбираться?</summary>
+        <div class="a">Нет. Заявки и записи приходят в ваш обычный Telegram. Вся настройка — моя работа, вам остаётся только отвечать клиентам.</div>
+      </details>
+      <details>
+        <summary>Есть ли ежемесячные платежи?</summary>
+        <div class="a">Оплата разовая — за установку. Хостинг подбираю бесплатный. Если позже захотите доработки или присмотр за ботом — это отдельно и по желанию (от 300 ₽/мес).</div>
+      </details>
+      <details>
+        <summary>А если что-то сломается?</summary>
+        <div class="a">Первая неделя поддержки бесплатна: чиню и правлю мелочи без доплат. Дальше — либо по обращению, либо недорогая ежемесячная поддержка.</div>
+      </details>
+      <details>
+        <summary>Почему так недорого?</summary>
+        <div class="a">У меня отработанные заготовки, поэтому настройка занимает часы, а не недели. Вы платите за результат, а не за время.</div>
+      </details>
+      <details>
+        <summary>Как я пойму, что бот мне подходит, до оплаты?</summary>
+        <div class="a">Я пришлю живое демо, настроенное под ваш бизнес: вы сами пройдёте путь клиента и увидите, как заявка приходит вам в Telegram. Решение — только после этого.</div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="contact" id="contact">
+  <div class="wrap">
+    <h2 class="reveal">Заказать или задать вопрос</h2>
+    <p class="sub reveal">Отвечаю быстро. Напишите пару слов о вашем бизнесе — пришлю демо.</p>
+    <div class="chips reveal">
+      <a class="btn btn-p" id="mail-btn" href="#">✉️ Написать на почту</a>
+      <a class="btn btn-g" id="tg-btn" href="#" target="_blank" rel="noopener" hidden>✈️ Написать в Telegram</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">TythanAI · боты и сайты для малого бизнеса · <span id="year"></span></div>
+</footer>
+
+<script>
+  const c = CONFIG;
+  document.getElementById("year").textContent = new Date().getFullYear();
+
+  // почта: кнопка контактов + кнопки «Заказать» с темой письма под каждый продукт
+  const mailto = (subject) =>
+    "mailto:" + c.email + "?subject=" + encodeURIComponent(subject) +
+    "&body=" + encodeURIComponent("Здравствуйте! Меня интересует: " + subject + ".\nМой бизнес: ");
+  document.getElementById("mail-btn").href = mailto("Заказ с сайта TythanAI");
+  document.querySelectorAll(".order").forEach(btn => { btn.href = mailto(btn.dataset.p); });
+
+  // Telegram появляется, когда вписан ник
+  if (c.telegram) {
+    const tg = document.getElementById("tg-btn");
+    tg.hidden = false;
+    tg.href = "https://t.me/" + c.telegram;
+  }
+  // «Попробовать демо» ведёт на демо-бота, если он указан, иначе — к контактам
+  if (c.demoBot) {
+    const d = document.getElementById("demo-btn");
+    d.href = "https://t.me/" + c.demoBot;
+    d.target = "_blank";
+    d.textContent = "Попробовать живое демо в Telegram";
+  }
+
+  // появление секций при прокрутке
+  const io = new IntersectionObserver(
+    es => es.forEach(e => e.isIntersecting && e.target.classList.add("on")),
+    { threshold: 0.12 }
+  );
+  document.querySelectorAll(".reveal").forEach(el => io.observe(el));
+
+  // лёгкая сетка из точек в герое
+  const cv = document.getElementById("fx"), ctx = cv.getContext("2d");
+  let pts = [];
+  function resize() {
+    cv.width = cv.offsetWidth; cv.height = cv.offsetHeight;
+    const n = Math.min(70, Math.floor(cv.width / 18));
+    pts = Array.from({ length: n }, () => ({
+      x: Math.random() * cv.width, y: Math.random() * cv.height,
+      vx: (Math.random() - .5) * .35, vy: (Math.random() - .5) * .35,
+    }));
+  }
+  function tick() {
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    for (const p of pts) {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0 || p.x > cv.width) p.vx *= -1;
+      if (p.y < 0 || p.y > cv.height) p.vy *= -1;
+    }
+    ctx.strokeStyle = "rgba(91,124,250,.14)";
+    for (let i = 0; i < pts.length; i++)
+      for (let j = i + 1; j < pts.length; j++) {
+        const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
+        if (dx * dx + dy * dy < 110 * 110) {
+          ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); ctx.stroke();
+        }
+      }
+    ctx.fillStyle = "rgba(140,160,255,.5)";
+    for (const p of pts) { ctx.beginPath(); ctx.arc(p.x, p.y, 1.6, 0, 7); ctx.fill(); }
+    requestAnimationFrame(tick);
+  }
+  addEventListener("resize", resize);
+  resize(); tick();
+</script>
+</body>
+</html>
