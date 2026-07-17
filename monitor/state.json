@@ -14,5 +14,5 @@
   "ton-blockchain/wallet-contract@main": "68b56dc0f7f6a9d41a190a4c91f6dc68b18f0600",
   "toncenter/pytonlib@main": "e905895d7189105a1c8671dba4a016d33c552ae4",
   "toncenter/ton-http-api@master": "a0ebc3f71d059438a290fcc46dd7eeedf9eee648",
-  "toncenter/ton-indexer@master": "1fe72ea51d6a402d7ec38299d8c82606ff8066ad"
+  "toncenter/ton-indexer@master": "eb9fbfa3212a583d3eef672f74b98600dfdd898c"
 }
