@@ -13,6 +13,6 @@
   "ton-blockchain/ton@testnet": "38d87a8c0f06a77e80aad908c58e1da0f39e1280",
   "ton-blockchain/wallet-contract@main": "68b56dc0f7f6a9d41a190a4c91f6dc68b18f0600",
   "toncenter/pytonlib@main": "391861fec0602f0f0ddd86312089eb28e07246f2",
-  "toncenter/ton-http-api@master": "a0ebc3f71d059438a290fcc46dd7eeedf9eee648",
+  "toncenter/ton-http-api@master": "4b4e54fc2045a1d708cf98f91648a6927e1faa24",
   "toncenter/ton-indexer@master": "eb9fbfa3212a583d3eef672f74b98600dfdd898c"
 }
