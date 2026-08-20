@@ -6,7 +6,7 @@
   "ton-blockchain/bug-bounty@main": "a964cb7c4219c1bd875092788b9d675365913a15",
   "ton-blockchain/dns-contract@main": "d08131031fb659d2826cccc417ddd9b98476f814",
   "ton-blockchain/multisig-contract@master": "ef8633e284d7d8594f6240c105fd5b31e9412849",
-  "ton-blockchain/mytonctrl@master": "90046e0bc95e704d42671ac90474df9ddbb7875b",
+  "ton-blockchain/mytonctrl@master": "64c2aa946a4e5925c2ac983f7acad4c846f55c44",
   "ton-blockchain/nominator-pool@main": "2f35c36b5ad662f10fd7b01ef780c3f1949c399d",
   "ton-blockchain/token-contract@main": "1182ad99413242f09925d50e70ccb7e0e09f94d4",
   "ton-blockchain/ton@master": "3d478cbde854be03a18ab2a59f8fc3c565cf7d14",
