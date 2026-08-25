@@ -10,7 +10,7 @@
   "ton-blockchain/nominator-pool@main": "2f35c36b5ad662f10fd7b01ef780c3f1949c399d",
   "ton-blockchain/token-contract@main": "1182ad99413242f09925d50e70ccb7e0e09f94d4",
   "ton-blockchain/ton@master": "3d478cbde854be03a18ab2a59f8fc3c565cf7d14",
-  "ton-blockchain/ton@testnet": "a863701b4b2ca2de4091418cfa71984870cc1bc8",
+  "ton-blockchain/ton@testnet": "8eb913eb5d47f07849b94fbdb3d686bd3089c4bb",
   "ton-blockchain/wallet-contract@main": "68b56dc0f7f6a9d41a190a4c91f6dc68b18f0600",
   "toncenter/pytonlib@main": "391861fec0602f0f0ddd86312089eb28e07246f2",
   "toncenter/ton-http-api@master": "4b4e54fc2045a1d708cf98f91648a6927e1faa24",
