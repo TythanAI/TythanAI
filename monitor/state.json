@@ -17,9 +17,9 @@
   "ton-blockchain/nominator-pool@main": "2f35c36b5ad662f10fd7b01ef780c3f1949c399d",
   "ton-blockchain/token-contract@main": "1182ad99413242f09925d50e70ccb7e0e09f94d4",
   "ton-blockchain/ton@master": "99143587e6babb2e577eadea0fc741cb1b413fab",
-  "ton-blockchain/ton@testnet": "4b73c6ececbb0726b0a59e64aebdd350680cbf59",
+  "ton-blockchain/ton@testnet": "b5ee4db075e80932915455f9b51d5e80f9010bbb",
   "ton-blockchain/wallet-contract@main": "68b56dc0f7f6a9d41a190a4c91f6dc68b18f0600",
   "toncenter/pytonlib@main": "391861fec0602f0f0ddd86312089eb28e07246f2",
   "toncenter/ton-http-api@master": "4b4e54fc2045a1d708cf98f91648a6927e1faa24",
-  "toncenter/ton-indexer@master": "574cedc0cf14d0034617ce9961793305aabba2f6"
+  "toncenter/ton-indexer@master": "609951b43d4aed3a7c7d375ca1f08184cb87709a"
 }
